@@ -177,6 +177,23 @@ def simple_renderer(rn,
         vc=albedo,
         light_color=np.array([.7, .7, .7]))
 
+    # print(rn.vc)
+    print(rn.vc.shape)
+
+    from plyfile import PlyData, PlyElement
+    bodypart_ply = "template-bodyparts.ply"
+    with open(bodypart_ply, 'rb') as f:
+        plydata = PlyData.read(f)
+        vc = np.zeros((6890, 3))
+        for i in range(len(plydata.elements[0].data)):
+            r = plydata.elements[0].data[i][-3]/255.0
+            g = plydata.elements[0].data[i][-2]/255.0
+            b = plydata.elements[0].data[i][-1]/255.0
+            vc[i] = [r, g, b]
+        rn.vc = vc
+    # print(rn.vc)
+
+
     return rn.r
 
 

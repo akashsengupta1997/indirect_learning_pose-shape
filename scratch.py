@@ -49,32 +49,48 @@ smpl_path = "./neutral_smpl_with_cocoplus_reg.pkl"
 num_beta = 10
 num_theta = 72
 dtype = np.float32
-batch_size = 3
+batch_size = 4
+
 smpl = SMPL(pkl_path=smpl_path)
 
-beta = np.zeros((batch_size, num_beta))
-beta[0][0] = 2
-beta[1][1] = 2
-beta = tf.Variable(beta, name='beta', dtype=dtype)
+beta = (np.random.randn(batch_size, num_beta) - 0.5) * 0.5
+beta = tf.Variable(beta, name='beta', dtype=dtype, trainable=False)
 
-theta = np.zeros((batch_size, num_theta))
-theta = tf.Variable(theta, name='theta', dtype=dtype)
+theta = (np.random.rand(batch_size, num_theta) - 0.5) * 0.5
+theta = tf.Variable(theta, name='theta', dtype=dtype, trainable=False)
 
 verts, _, _ = smpl(beta, theta, get_skin=True)
-print(verts.shape)
-print(type(verts))
 
+init_op = tf.global_variables_initializer()
+sess = tf.Session()
+sess.run(init_op)
+result = sess.run({'verts': verts})
+print(result['verts'].shape)
+print(type(result['verts']))
+
+result_verts = result['verts']
 renderer = SMPLRenderer()
-rend_img0 = renderer(verts=verts[0])
-rend_img1 = renderer(verts=verts[1])
-rend_img2 = renderer(verts=verts[2])
+rend_img0 = renderer(verts=result_verts[0])
+rend_img1 = renderer(verts=result_verts[1])
+rend_img2 = renderer(verts=result_verts[2])
+rend_img3 = renderer(verts=result_verts[3])
 plt.figure()
-plt.subplot(311)
+plt.subplot(221)
 plt.imshow(rend_img0)
-plt.subplot(312)
+plt.subplot(222)
 plt.imshow(rend_img1)
-plt.subplot(313)
+plt.subplot(223)
 plt.imshow(rend_img2)
+plt.subplot(224)
+plt.imshow(rend_img3)
 plt.show()
 
-asdasd
+# PLY file and vertex colouring
+# from plyfile import PlyData, PlyElement
+# bodypart_ply = "template-bodyparts.ply"
+# with open(bodypart_ply, 'rb') as f:
+#     plydata = PlyData.read(f)
+#     print(plydata.elements)
+#     for vertex in plydata.elements[0].data:
+#         print('rgb', vertex[-3], vertex[-2], vertex[-1])
+
