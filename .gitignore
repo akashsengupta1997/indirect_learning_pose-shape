@@ -7,3 +7,4 @@
 *.pyc
 *.iml
 .idea/indirect_learning_pose+shape.iml
+scratch.py
