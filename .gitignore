@@ -1,10 +1,8 @@
 *.iml
 *.xml
 *.pyc
-.idea*
-
 *scratch*
-*.pyc
-*.iml
-.idea/indirect_learning_pose+shape.iml
-scratch.py
+.idea/*
+.DS_Store
+
+tf_smpl/*
