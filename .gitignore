@@ -1,0 +1,9 @@
+*.iml
+*.xml
+*.pyc
+.idea*
+
+*scratch*
+*.pyc
+*.iml
+.idea/indirect_learning_pose+shape.iml

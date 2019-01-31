@@ -38,7 +38,8 @@ class SMPLRenderer(object):
                  far=None,
                  near=None,
                  color_id=0,
-                 img_size=None):
+                 img_size=None,
+                 render_seg=False):
         """
         cam is 3D [f, px, py]
         """
@@ -77,7 +78,8 @@ class SMPLRenderer(object):
             img=img,
             far=far,
             near=near,
-            color_id=color_id)
+            color_id=color_id,
+            render_seg=render_seg)
 
         return (imtmp * 255).astype('uint8')
 
@@ -145,54 +147,52 @@ def simple_renderer(rn,
                     verts,
                     faces,
                     yrot=np.radians(0),
-                    color=colors['light_pink']):
+                    color=colors['light_pink'],
+                    render_seg=False):
     # Rendered model color
     rn.set(v=verts, f=faces, vc=color, bgcolor=np.ones(3))
     albedo = rn.vc
 
-    # Construct Back Light (on back right corner)
-    rn.vc = LambertianPointLight(
-        f=rn.f,
-        v=rn.v,
-        num_verts=len(rn.v),
-        light_pos=_rotateY(np.array([-200, -100, -100]), yrot),
-        vc=albedo,
-        light_color=np.array([1, 1, 1]))
+    if render_seg:
+        from plyfile import PlyData, PlyElement
+        bodypart_ply = "template-bodyparts.ply"
+        with open(bodypart_ply, 'rb') as f:
+            plydata = PlyData.read(f)
+            vc = np.zeros((6890, 3))
+            for i in range(len(plydata.elements[0].data)):
+                r = plydata.elements[0].data[i][-3] / 255.0
+                g = plydata.elements[0].data[i][-2] / 255.0
+                b = plydata.elements[0].data[i][-1] / 255.0
+                vc[i] = [r, g, b]
+            rn.vc = vc
 
-    # Construct Left Light
-    rn.vc += LambertianPointLight(
-        f=rn.f,
-        v=rn.v,
-        num_verts=len(rn.v),
-        light_pos=_rotateY(np.array([800, 10, 300]), yrot),
-        vc=albedo,
-        light_color=np.array([1, 1, 1]))
+    else:
+        # Construct Back Light (on back right corner)
+        rn.vc = LambertianPointLight(
+            f=rn.f,
+            v=rn.v,
+            num_verts=len(rn.v),
+            light_pos=_rotateY(np.array([-200, -100, -100]), yrot),
+            vc=albedo,
+            light_color=np.array([1, 1, 1]))
 
-    # Construct Right Light
-    rn.vc += LambertianPointLight(
-        f=rn.f,
-        v=rn.v,
-        num_verts=len(rn.v),
-        light_pos=_rotateY(np.array([-500, 500, 1000]), yrot),
-        vc=albedo,
-        light_color=np.array([.7, .7, .7]))
+        # Construct Left Light
+        rn.vc += LambertianPointLight(
+            f=rn.f,
+            v=rn.v,
+            num_verts=len(rn.v),
+            light_pos=_rotateY(np.array([800, 10, 300]), yrot),
+            vc=albedo,
+            light_color=np.array([1, 1, 1]))
 
-    # print(rn.vc)
-    print(rn.vc.shape)
-
-    from plyfile import PlyData, PlyElement
-    bodypart_ply = "template-bodyparts.ply"
-    with open(bodypart_ply, 'rb') as f:
-        plydata = PlyData.read(f)
-        vc = np.zeros((6890, 3))
-        for i in range(len(plydata.elements[0].data)):
-            r = plydata.elements[0].data[i][-3]/255.0
-            g = plydata.elements[0].data[i][-2]/255.0
-            b = plydata.elements[0].data[i][-1]/255.0
-            vc[i] = [r, g, b]
-        rn.vc = vc
-    # print(rn.vc)
-
+        # Construct Right Light
+        rn.vc += LambertianPointLight(
+            f=rn.f,
+            v=rn.v,
+            num_verts=len(rn.v),
+            light_pos=_rotateY(np.array([-500, 500, 1000]), yrot),
+            vc=albedo,
+            light_color=np.array([.7, .7, .7]))
 
     return rn.r
 
@@ -226,7 +226,8 @@ def render_model(verts,
                  far=25,
                  img=None,
                  do_alpha=False,
-                 color_id=None):
+                 color_id=None,
+                 render_seg=False):
     rn = _create_renderer(
         w=w, h=h, near=near, far=far, rt=cam.rt, t=cam.t, f=cam.f, c=cam.c)
 
@@ -240,7 +241,7 @@ def render_model(verts,
         color_list = colors.values()
         color = color_list[color_id % len(color_list)]
 
-    imtmp = simple_renderer(rn, verts, faces, color=color)
+    imtmp = simple_renderer(rn, verts, faces, color=color, render_seg=render_seg)
 
     # If white bg, make transparent.
     if img is None and do_alpha:
