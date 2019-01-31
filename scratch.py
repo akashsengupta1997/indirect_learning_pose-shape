@@ -5,6 +5,7 @@ import tensorflow as tf
 from renderer import SMPLRenderer
 from matplotlib import pyplot as plt
 from tf_smpl.batch_smpl import undo_chumpy, SMPL
+from tf_smpl.projection import batch_verts_to_part_labels
 
 smpl_path = "./neutral_smpl_with_cocoplus_reg.pkl"
 
@@ -61,6 +62,7 @@ theta = tf.Variable(theta, name='theta', dtype=dtype, trainable=False)
 
 verts, _, _ = smpl(beta, theta, get_skin=True)
 
+
 init_op = tf.global_variables_initializer()
 sess = tf.Session()
 sess.run(init_op)
@@ -70,10 +72,10 @@ print(type(result['verts']))
 
 result_verts = result['verts']
 renderer = SMPLRenderer()
-rend_img0 = renderer(verts=result_verts[0])
-rend_img1 = renderer(verts=result_verts[1])
-rend_img2 = renderer(verts=result_verts[2])
-rend_img3 = renderer(verts=result_verts[3])
+rend_img0 = renderer(verts=result_verts[0], render_seg=True)
+rend_img1 = renderer(verts=result_verts[1], render_seg=True)
+rend_img2 = renderer(verts=result_verts[2], render_seg=True)
+rend_img3 = renderer(verts=result_verts[3], render_seg=True)
 plt.figure()
 plt.subplot(221)
 plt.imshow(rend_img0)
@@ -84,13 +86,4 @@ plt.imshow(rend_img2)
 plt.subplot(224)
 plt.imshow(rend_img3)
 plt.show()
-
-# PLY file and vertex colouring
-# from plyfile import PlyData, PlyElement
-# bodypart_ply = "template-bodyparts.ply"
-# with open(bodypart_ply, 'rb') as f:
-#     plydata = PlyData.read(f)
-#     print(plydata.elements)
-#     for vertex in plydata.elements[0].data:
-#         print('rgb', vertex[-3], vertex[-2], vertex[-1])
 

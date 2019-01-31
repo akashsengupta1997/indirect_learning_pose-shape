@@ -30,7 +30,6 @@ class SMPL(object):
         # -- Load SMPL params --
         with open(pkl_path, 'r') as f:
             dd = pickle.load(f)
-            print(dd['v_template'])
         # Mean template vertices
         self.v_template = tf.Variable(
             undo_chumpy(dd['v_template']),
@@ -155,7 +154,6 @@ class SMPL(object):
             joint_z = tf.matmul(verts[:, :, 2], self.joint_regressor)
             joints = tf.stack([joint_x, joint_y, joint_z], axis=2)
 
-            print(type(verts))
             if get_skin:
                 return verts, joints, Rs
             else:

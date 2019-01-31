@@ -27,3 +27,14 @@ def batch_orth_proj_idrot(X, camera, name=None):
         shape = tf.shape(X_trans)
         return tf.reshape(
             camera[:, :, 0] * tf.reshape(X_trans, [shape[0], -1]), shape)
+
+
+def batch_verts_to_part_labels(verts, cams, name=None):
+    with tf.name_scope(name, "batch_verts_to_parts", [verts, cams]):
+        camera = tf.reshape(cams, [-1, 1, 3], name="cam_adj_shape")
+
+        verts_trans = verts[:, :, :2] + camera[:, :, 1:]
+
+        shape = tf.shape(verts_trans)
+        return tf.reshape(
+            camera[:, :, 0] * tf.reshape(verts_trans, [shape[0], -1]), shape)
