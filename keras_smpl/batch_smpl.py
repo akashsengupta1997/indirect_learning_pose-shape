@@ -21,9 +21,10 @@ def undo_chumpy(x):
 
 
 class SMPLLayer(Layer):
-    def __init__(self, pkl_path, dtype='float32', **kwargs):
+    def __init__(self, pkl_path, batch_size=8, dtype='float32', **kwargs):
         self.pkl_path = pkl_path
         self.dtype = dtype
+        self.batch_size = batch_size
 
         super(SMPLLayer, self).__init__(**kwargs)
 
@@ -87,13 +88,14 @@ class SMPLLayer(Layer):
         print('LBS weights dims', self.lbs_weights.shape)
 
         # Number of camera parameters
-        self.num_cam = 3
+        self.num_cam = 6
 
         self.non_trainable_weights = [self.v_template, self.shapedirs, self.J_regressor,
                                       self.posedirs, self.lbs_weights]
         # Add these to trainable weights if want to train them
 
     def call(self, x):
+
         thetas = x[:, self.num_cam:(self.num_cam + self.num_thetas)]
         betas = x[:, (self.num_cam + self.num_thetas):]
         print('Check shape params', betas.shape)
@@ -118,7 +120,7 @@ class SMPLLayer(Layer):
         # 3. Compute Rodigrues matrices from joint axis angle rotations
         # N x 24 x 3 x 3
         Rs = K.reshape(
-            self.batch_rodrigues(K.reshape(thetas, [-1, 3]), batch_size=batch_size), [-1, 24, 3, 3])
+            self.batch_rodrigues(K.reshape(thetas, [-1, 3]), batch_size=self.batch_size), [-1, 24, 3, 3])
         # Ignore global rotation.
         pose_feature = K.reshape(Rs[:, 1:, :, :] - K.eye(3), [-1, 207])
 
@@ -135,13 +137,13 @@ class SMPLLayer(Layer):
         # 5. Do skinning:
         # W is N x 6890 x 24
         W = tf.reshape(
-            tf.tile(self.lbs_weights, [batch_size, 1]), [batch_size, -1, 24])
+            tf.tile(self.lbs_weights, [self.batch_size, 1]), [self.batch_size, -1, 24])
         # (N x 6890 x 24) x (N x 24 x 16)
         T = tf.reshape(
-            tf.matmul(W, tf.reshape(A, [batch_size, 24, 16])),
-            [batch_size, -1, 4, 4])
+            tf.matmul(W, tf.reshape(A, [self.batch_size, 24, 16])),
+            [self.batch_size, -1, 4, 4])
         v_posed_homo = tf.concat(
-            [v_posed, tf.ones([batch_size, v_posed.shape[1], 1])], 2)
+            [v_posed, tf.ones([self.batch_size, v_posed.shape[1], 1])], 2)
         v_homo = tf.matmul(T, tf.expand_dims(v_posed_homo, -1))
 
         verts = v_homo[:, :, :3, 0]
@@ -246,7 +248,9 @@ class SMPLLayer(Layer):
         Output rodrigues angle matrices are N*K x 3 x 3.
 
         """
-        input_size = theta.shape.as_list()[0]
+        # input_size = theta.shape.as_list()[0]
+        # print(theta.shape.as_list())
+        input_size = batch_size * self.num_joints
 
         angle = K.expand_dims(tf.norm(theta + 1e-8, axis=1), -1)
         r = K.expand_dims(tf.div(theta, angle), -1)
