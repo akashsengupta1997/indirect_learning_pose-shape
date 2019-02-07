@@ -88,7 +88,7 @@ class SMPLLayer(Layer):
         print('LBS weights dims', self.lbs_weights.shape)
 
         # Number of camera parameters
-        self.num_cam = 6
+        self.num_cam = 5
 
         self.non_trainable_weights = [self.v_template, self.shapedirs, self.J_regressor,
                                       self.posedirs, self.lbs_weights]
