@@ -135,7 +135,9 @@ class SMPLLayer(Layer):
         return verts
 
     def compute_output_shape(self, input_shape):
-        output_shape = (input_shape[0], self.v_template.shape[0], self.v_template.shape[1])
+        output_shape = (input_shape[0],
+                        self.v_template.shape[0].value,
+                        self.v_template.shape[1].value)
         return output_shape
 
     def get_config(self):
