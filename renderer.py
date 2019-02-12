@@ -24,7 +24,7 @@ class SMPLRenderer(object):
     def __init__(self,
                  img_size=224,
                  flength=500.,
-                 face_path="tf_smpl/smpl_faces.npy"):
+                 face_path="keras_smpl/smpl_faces.npy"):
         self.faces = np.load(face_path)
         self.w = img_size
         self.h = img_size
