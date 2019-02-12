@@ -259,6 +259,7 @@ def train(img_wh, output_img_wh, dataset):
             plt.figure(2)
             plt.clf()
             plt.scatter(test_projects[0, :, 0], test_projects[0, :, 1], s=1)
+            plt.gca().set_aspect('equal', adjustable='box')
             plt.savefig("./test_outputs/verts_" + str(trials) + ".png")
             plt.figure(3)
             plt.clf()
