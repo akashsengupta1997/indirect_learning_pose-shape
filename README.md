@@ -1,1 +1,1 @@
-# indirect_learning_pose-shape
+# Human 3D pose and shape estimation via indirect learning.
