@@ -39,14 +39,11 @@ class SMPLLayer(Layer):
             undo_chumpy(dd['v_template']),
             name='v_template',
             dtype=self.dtype)
-        print('V template dims', self.v_template.shape)
 
         # Size of mesh [Number of vertices, 3]
         self.size = [self.v_template.shape[0].value, 3]
-        print('Num vertices', self.size)
         # Number of shape parameters
         self.num_betas = dd['shapedirs'].shape[-1]
-        print('Num shape params', self.num_betas)
 
         # Shape blend shape basis: 6980 x 3 x 10
         # reshaped to 6980*30 x 10, transposed to 10x6980*3
@@ -56,14 +53,12 @@ class SMPLLayer(Layer):
             shapedir,
             name='shapedirs',
             dtype=self.dtype)
-        print('Shape blend shapes dims', self.shapedirs.shape)
 
         # Regressor for joint locations given shape - 6890 x 24
         self.J_regressor = K.variable(
             dd['J_regressor'].T.todense(),
             name="J_regressor",
             dtype=self.dtype)
-        print('J regressor (from shaped rest vertices) dims', self.J_regressor.shape)
 
         # Pose blend shape basis: 6890 x 3 x 207, reshaped to 6890*3 x 207 then transposed
         num_pose_basis = dd['posedirs'].shape[-1]
@@ -71,21 +66,17 @@ class SMPLLayer(Layer):
             undo_chumpy(dd['posedirs']), [-1, num_pose_basis]).T
         self.posedirs = K.variable(
             posedirs, name='posedirs', dtype=self.dtype)
-        print('Pose blend shape dims', self.posedirs.shape)
 
         # Indices of parents for each joints
         self.parents = dd['kintree_table'][0].astype(np.int32)
         self.num_joints = self.parents.shape[-1]
         self.num_thetas = self.num_joints * 3
-        print('Num joints', self.num_joints)
-        print('Num pose params', self.num_thetas)
 
         # LBS weights - i.e. how much the rotation of each joint affects each vertex
         self.lbs_weights = K.variable(
             undo_chumpy(dd['weights']),
             name='lbs_weights',
             dtype=self.dtype)
-        print('LBS weights dims', self.lbs_weights.shape)
 
         # Number of camera parameters
         self.num_cam = 5
@@ -98,16 +89,12 @@ class SMPLLayer(Layer):
 
         thetas = x[:, self.num_cam:(self.num_cam + self.num_thetas)]
         betas = x[:, (self.num_cam + self.num_thetas):]
-        print('Check shape params', betas.shape)
-        print('Check pose params', thetas.shape)
-        batch_size = x.shape[0].value
 
         # 1. Add shape blend shapes
         # (N x 10) x (10 x 6890*3) = N x 6890*3 => N x 6890 x 3
         v_shaped = K.reshape(
             K.dot(betas, self.shapedirs),
             [-1, self.size[0], self.size[1]]) + self.v_template
-        print('Check v_shaped', v_shaped.shape)
 
         # 2. Infer shape-dependent joint locations.
         # (N x 6890) x (6890 x 24) for each x, y, z
@@ -115,7 +102,6 @@ class SMPLLayer(Layer):
         Jy = K.dot(v_shaped[:, :, 1], self.J_regressor)
         Jz = K.dot(v_shaped[:, :, 2], self.J_regressor)
         J = K.stack([Jx, Jy, Jz], axis=2)
-        print('Check shaped joint locs', J.shape)
 
         # 3. Compute Rodigrues matrices from joint axis angle rotations
         # N x 24 x 3 x 3
@@ -129,7 +115,6 @@ class SMPLLayer(Layer):
         v_posed = K.reshape(
             K.dot(pose_feature, self.posedirs),
             [-1, self.size[0], self.size[1]]) + v_shaped
-        print('Check v posed', v_posed.shape)
 
         # 5. Get the global joint location
         self.J_transformed, A = self.batch_global_rigid_transformation(Rs, J, self.parents)
@@ -152,6 +137,13 @@ class SMPLLayer(Layer):
     def compute_output_shape(self, input_shape):
         output_shape = (input_shape[0], self.v_template.shape[0], self.v_template.shape[1])
         return output_shape
+
+    def get_config(self):
+        config = {'pkl_path': self.pkl_path,
+                  'batch_size': self.batch_size,
+                  'dtype': self.dtype}
+        base_config = super(SMPLLayer, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
     def batch_global_rigid_transformation(self, Rs, Js, parent, rotate_base=False):
         """

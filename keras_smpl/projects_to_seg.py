@@ -22,8 +22,8 @@ def projects_to_seg(projects):
     with open(part_indices_path, 'rb') as f:
         part_indices = pickle.load(f)
 
-    i = tf.range(0, 64)
-    j = tf.range(0, 64)
+    i = tf.range(0, img_wh)
+    j = tf.range(0, img_wh)
 
     t1, t2 = tf.meshgrid(i, j)
     grid = tf.cast(tf.stack([t1, t2], axis=2), dtype='float32')
@@ -35,27 +35,26 @@ def projects_to_seg(projects):
         num_indices = len(indices)
         part_projects = tf.gather(projects, indices, axis=1)  # N x num_indices x 2
         part_projects = tf.tile(tf.expand_dims(part_projects, axis=1),
-                                [1, img_wh*img_wh, 1, 1])  # N x 4096 x num_indices x 2
+                                [1, img_wh*img_wh, 1, 1])  # N x img_wh^2 x num_indices x 2
         expanded_grid = tf.tile(tf.expand_dims(reshaped_grid, axis=1),
-                                [1, num_indices, 1])  # 4096 x num_indices x 2
+                                [1, num_indices, 1])  # img_wh^2 x num_indices x 2
 
-        diff = tf.subtract(part_projects, expanded_grid)  # N x 4096 x num_indices x 2
-        norm = tf.norm(diff, axis=3)  # N x 4096 x num_indices
-        exp = tf.exp(tf.negative(norm))  # N x 4096 x num_indices
-        scores = tf.reduce_max(exp, axis=2)  # N x 4096
-        seg = tf.reshape(scores, [-1, img_wh, img_wh])  # N x 64 x 64
+        diff = tf.subtract(part_projects, expanded_grid)  # N x img_wh^2 x num_indices x 2
+        norm = tf.norm(diff, axis=3)  # N x img_wh^2 x num_indices
+        exp = tf.exp(tf.negative(norm))  # N x img_wh^2 x num_indices
+        scores = tf.reduce_max(exp, axis=2)  # N x img_wh^2
+        seg = tf.reshape(scores, [-1, img_wh, img_wh])  # N x img_wh x img_wh
         segs.append(seg)
 
-    stacked_segs = tf.stack(segs, axis=3)  # N x 64 x 64 x 31
+    stacked_segs = tf.stack(segs, axis=3)  # N x img_wh x img_wh x 31
     silhouettes = tf.subtract(1.0,
                               tf.clip_by_value(tf.reduce_sum(stacked_segs, axis=3),
                                                clip_value_min=0,
-                                               clip_value_max=1))  # N x 64 x 64
+                                               clip_value_max=1))  # N x img_wh x img_wh
     # segs.insert(0, silhouettes)
     output_segs = tf.concat([tf.expand_dims(silhouettes, axis=3), stacked_segs],
-                            axis=3)  # N x 64 x 64 x 32
+                            axis=3)  # N x img_wh x img_wh x 32
     output_segs = K.reverse(output_segs, axes=1)
-    print(output_segs.shape)
     return output_segs
 
     # scores_hand = []

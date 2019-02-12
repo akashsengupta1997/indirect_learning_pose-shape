@@ -8,8 +8,8 @@ import tensorflow as tf
 
 def persepective_project(inputs):
     """
-    :param X: N x num_vertices x 3 tensor
-    :param camera: N x num_camera_params
+
+    :param inputs:
     :return:
     """
     verts = inputs[0]
@@ -21,7 +21,12 @@ def persepective_project(inputs):
     T1 = smpl[:, 2]
     T2 = smpl[:, 3]
     T3 = smpl[:, 4]
-    print('Cam params: ku, kv', k_u.shape, k_v.shape, T1.shape, T2.shape, T3.shape)
+
+    # k_u = 250.0
+    # k_v = 250.0
+    # T1 = tf.expand_dims(tf.constant(0.0), axis=0)
+    # T2 = tf.expand_dims(tf.constant(0.0), axis=0)
+    # T3 = tf.expand_dims(tf.constant(10.0), axis=0)
 
     # Rigid body transformation
     T = tf.stack([T1, T2, T3], axis=1)
@@ -37,6 +42,8 @@ def persepective_project(inputs):
     k_v = tf.tile(tf.expand_dims(k_v, axis=1), [1, 6890])
     u = tf.add(u0, tf.multiply(x, k_u))
     v = tf.add(v0, tf.multiply(y, k_v))
+    # u = tf.add(u0, tf.scalar_mul(k_u, x))
+    # v = tf.add(v0, tf.scalar_mul(k_v, y))
     pixel_coords = tf.stack([u, v], axis=2)
 
     return pixel_coords
