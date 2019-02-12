@@ -3,7 +3,8 @@ import os
 from matplotlib import pyplot as plt
 
 from keras.models import Model
-from keras.layers import Input, Flatten, Dense, Lambda, Reshape, BatchNormalization
+from keras.layers import Input, Flatten, Dense, Lambda, Reshape, Conv2D, MaxPooling2D, \
+    BatchNormalization, Activation
 from keras.preprocessing.image import ImageDataGenerator
 
 from keras_smpl.batch_smpl import SMPLLayer
@@ -17,10 +18,28 @@ from renderer import SMPLRenderer
 def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes):
     num_camera_params = 5
     num_smpl_params = 72 + 10 + num_camera_params
+
     inp = Input(shape=input_shape)
     enet = build_enet(inp)  # (N, 32, 32, 128) output size from enet
-    enet = Flatten()(enet)
-    enet = Dense(512, activation='relu')(enet)
+
+    conv_block1 = MaxPooling2D()(enet)
+    conv_block1 = Conv2D(128, (3, 3))(conv_block1)
+    conv_block1 = BatchNormalization()(conv_block1)
+    conv_block1 = Activation('relu')(conv_block1)
+    conv_block1 = MaxPooling2D()(conv_block1)  # (N, 7, 7, 128)
+
+    conv_block2 = Conv2D(64, (3, 3))(conv_block1)
+    conv_block2 = BatchNormalization()(conv_block2)
+    conv_block2 = Activation('relu')(conv_block2)
+    conv_block2 = MaxPooling2D()(conv_block2)  # (N, 2, 2, 64)
+
+    conv_block3 = Conv2D(64, (2, 2))(conv_block2)
+    conv_block3 = BatchNormalization()(conv_block3)
+    conv_block3 = Activation('relu')(conv_block3)  # (N, 1, 1, 64)
+    enet = Flatten()(conv_block3)
+
+    # enet = Flatten()(enet)
+    enet = Dense(2048, activation='relu')(enet)
     enet = Dense(128, activation='tanh')(enet)
     smpl = Dense(num_smpl_params)(enet)
     smpl = Lambda(add_mean_params)(smpl)
@@ -33,6 +52,8 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
     smpl_model = Model(inputs=inp, outputs=smpl)
     verts_model = Model(inputs=inp, outputs=verts)
     projects_model = Model(inputs=inp, outputs=projects)
+
+    print(segs_model.summary())
 
     return segs_model, smpl_model, verts_model, projects_model
 
