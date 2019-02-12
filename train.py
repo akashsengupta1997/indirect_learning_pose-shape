@@ -236,17 +236,20 @@ def train(img_wh, output_img_wh, dataset):
                                             nb_epoch=nb_epoch,
                                             verbose=1)
 
+
+        # TODO remove this testing code
         test_data, _ = generate_data(train_image_generator,
                                      train_mask_generator,
                                      1,
                                      num_classes,
                                      dataset)
         print(smpl_test_model.predict(test_data))
-        if trials % 10 == 0 and trials != 0:
+        if trials % 10 == 0:
             test_verts = verts_test_model.predict(test_data)
             test_projects = projects_test_model.predict(test_data)
-            test_seg = indirect_learn_model.predict(test_data)
-            test_seg_map = np.argmax(test_seg, axis=2)
+            test_seg = np.reshape(indirect_learn_model.predict(test_data),
+                                  (1, output_img_wh, output_img_wh, num_classes))
+            test_seg_map = np.argmax(test_seg[0], axis=-1)
             renderer = SMPLRenderer()
             rend_img_keras_model = renderer(verts=test_verts[0], render_seg=False)
             plt.figure(1)
