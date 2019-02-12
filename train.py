@@ -18,7 +18,7 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
     num_camera_params = 5
     num_smpl_params = 72 + 10 + num_camera_params
     inp = Input(shape=input_shape)
-    enet = build_enet(inp)
+    enet = build_enet(inp)  # (N, 32, 32, 128) output size from enet
     enet = Flatten()(enet)
     enet = Dense(512, activation='relu')(enet)
     enet = Dense(128, activation='tanh')(enet)
@@ -242,16 +242,19 @@ def train(img_wh, output_img_wh, dataset):
                                      num_classes,
                                      dataset)
         print(smpl_test_model.predict(test_data))
-        # if trials % 5 == 0 and trials != 0:
-        #     test_verts = verts_test_model.predict(test_data)
-        #     test_projects = projects_test_model.predict(test_data)
-        #     renderer = SMPLRenderer()
-        #     rend_img_keras_model = renderer(verts=test_verts[0], render_seg=False)
-        #     plt.figure(1)
-        #     plt.imshow(rend_img_keras_model)
-        #     plt.figure(2)
-        #     plt.scatter(test_projects[0, :, 0], test_projects[0, :, 1], s=1)
-        #     plt.show()
+        if trials % 10 == 0 and trials != 0:
+            test_verts = verts_test_model.predict(test_data)
+            test_projects = projects_test_model.predict(test_data)
+            test_seg = indirect_learn_model.predict(test_data)
+            renderer = SMPLRenderer()
+            rend_img_keras_model = renderer(verts=test_verts[0], render_seg=False)
+            plt.figure(1)
+            plt.imshow(rend_img_keras_model)
+            plt.savefig("./test_outputs/rend_" + str(trials) + ".png")
+            plt.figure(2)
+            plt.scatter(test_projects[0, :, 0], test_projects[0, :, 1], s=1)
+            plt.savefig("./test_outputs/verts_" + str(trials) + ".png")
+            # plt.show()
 
         # if trials % 100 == 0:
         #     indirect_learn_model.save('test_models/ups31_'
