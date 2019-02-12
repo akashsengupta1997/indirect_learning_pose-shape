@@ -22,8 +22,8 @@ def persepective_project(verts):
     # T2 = smpl[:, 3]
     # T3 = smpl[:, 4]
 
-    k_u = 150.0
-    k_v = 150.0
+    k_u = 200.0
+    k_v = 200.0
     T1 = tf.expand_dims(tf.constant(0.0), axis=0)
     T2 = tf.expand_dims(tf.constant(0.0), axis=0)
     T3 = tf.expand_dims(tf.constant(10.0), axis=0)
