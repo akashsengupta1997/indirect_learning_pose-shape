@@ -22,32 +22,16 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
     inp = Input(shape=input_shape)
     enet = build_enet(inp)  # (N, 32, 32, 128) output size from enet
 
-    # conv_block1 = MaxPooling2D()(enet)
-    conv_block1 = Conv2D(128, (3, 3))(enet)
-    conv_block1 = BatchNormalization()(conv_block1)
-    conv_block1 = Activation('relu')(conv_block1)
-    # conv_block1 = MaxPooling2D()(conv_block1)  # (N, 7, 7, 128)
-
-    conv_block2 = Conv2D(64, (3, 3))(conv_block1)
-    conv_block2 = BatchNormalization()(conv_block2)
-    conv_block2 = Activation('relu')(conv_block2)
-    # conv_block2 = MaxPooling2D()(conv_block2)  # (N, 2, 2, 64)
-
-    conv_block3 = Conv2D(64, (2, 2))(conv_block2)
-    conv_block3 = BatchNormalization()(conv_block3)
-    conv_block3 = Activation('relu')(conv_block3)  # (N, 1, 1, 64)
-    enet = Flatten()(conv_block3)
-
-    # enet = Flatten()(enet)
+    enet = Flatten()(enet)
     enet = Dense(2048, activation='relu')(enet)
     enet = BatchNormalization()(enet)
     enet = Dense(128, activation='tanh')(enet)
     enet = BatchNormalization()(enet)
     smpl = Dense(num_smpl_params, activation='tanh')(enet)
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(smpl)
-    # projects = Lambda(persepective_project)(verts)
-    projects = Lambda(orthographic_project)(verts)
-    segs = Lambda(projects_to_seg)(projects)
+    # projects = Lambda(persepective_project, name='projection')(verts)
+    projects = Lambda(orthographic_project, name='projection')(verts)
+    segs = Lambda(projects_to_seg, name='segmentation')(projects)
     segs = Reshape((output_img_wh * output_img_wh, num_classes))(segs)
 
     segs_model = Model(inputs=inp, outputs=segs)
