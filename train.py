@@ -25,6 +25,7 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
     enet = Dense(2048, activation='relu')(enet)
     enet = BatchNormalization()(enet)
     enet = Dense(128, activation='relu')(enet)
+    enet = BatchNormalization()(enet)
     smpl = Dense(num_smpl_params, activation='tanh')(enet)
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(smpl)
     projects = Lambda(persepective_project)(verts)
