@@ -30,7 +30,7 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
         inp = resnet.input
         encoder = resnet.output
 
-    encoder = Flatten()(encoder_architecture)
+    encoder = Flatten()(encoder)
     encoder = Dense(2048, activation='relu')(encoder)
     encoder = BatchNormalization()(encoder)
     encoder = Dense(1024, activation='relu')(encoder)
@@ -42,6 +42,7 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
     projects = Lambda(orthographic_project, name='projection')(verts)
     segs = Lambda(projects_to_seg, name='segmentation')(projects)
     segs = Reshape((output_img_wh * output_img_wh, num_classes))(segs)
+    segs = Activation('softmax')(segs)
 
     segs_model = Model(inputs=inp, outputs=segs)
     smpl_model = Model(inputs=inp, outputs=smpl)
