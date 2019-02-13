@@ -78,8 +78,8 @@ class SMPLLayer(Layer):
             name='lbs_weights',
             dtype=self.dtype)
 
-        # Number of camera parameters
-        self.num_cam = 5
+        # # Number of camera parameters
+        # self.num_cam = 5
 
         self.non_trainable_weights = [self.v_template, self.shapedirs, self.J_regressor,
                                       self.posedirs, self.lbs_weights]
@@ -87,11 +87,11 @@ class SMPLLayer(Layer):
 
     def call(self, x):
 
-        # thetas = x[:, :self.num_thetas]
-        # betas = x[:, self.num_thetas:]
+        thetas = x[:, :self.num_thetas]
+        betas = x[:, self.num_thetas:]
 
-        thetas = x[:, self.num_cam:(self.num_thetas+self.num_cam)]
-        betas = x[:, (self.num_cam + self.num_thetas):]
+        # thetas = x[:, self.num_cam:(self.num_thetas+self.num_cam)]
+        # betas = x[:, (self.num_cam + self.num_thetas):]
 
         # 1. Add shape blend shapes
         # (N x 10) x (10 x 6890*3) = N x 6890*3 => N x 6890 x 3
