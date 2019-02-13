@@ -6,7 +6,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 
-def persepective_project(verts):
+def persepective_project(inputs):
     """
     Perspective projection of vertices onto image plane.
     For now, the camera parameters (T and intrinsics) are hard-coded here - could try and learn
@@ -14,19 +14,22 @@ def persepective_project(verts):
     :param verts: Batch of vertices with shape N x 6890 x 3
     :return:
     """
+
+    verts = inputs[0]
+    smpl = inputs[1]
     img_wh = 64
 
-    # k_u = smpl[:, 0]
-    # k_v = smpl[:, 1]
-    # T1 = smpl[:, 2]
-    # T2 = smpl[:, 3]
-    # T3 = smpl[:, 4]
+    k_u = smpl[:, 0]
+    k_v = smpl[:, 1]
+    T1 = smpl[:, 2]
+    T2 = smpl[:, 3]
+    T3 = smpl[:, 4]
 
-    k_u = 200.0
-    k_v = 200.0
-    T1 = tf.expand_dims(tf.constant(0.0), axis=0)
-    T2 = tf.expand_dims(tf.constant(0.0), axis=0)
-    T3 = tf.expand_dims(tf.constant(10.0), axis=0)
+    # k_u = 200.0
+    # k_v = 200.0
+    # T1 = tf.expand_dims(tf.constant(0.0), axis=0)
+    # T2 = tf.expand_dims(tf.constant(0.0), axis=0)
+    # T3 = tf.expand_dims(tf.constant(10.0), axis=0)
 
     # Rigid body transformation
     T = tf.stack([T1, T2, T3], axis=1)
@@ -38,12 +41,12 @@ def persepective_project(verts):
     y = tf.div(verts[:, :, 1], verts[:, :, 2])
     u0 = img_wh / 2.0
     v0 = img_wh / 2.0
-    # k_u = tf.tile(tf.expand_dims(k_u, axis=1), [1, 6890])
-    # k_v = tf.tile(tf.expand_dims(k_v, axis=1), [1, 6890])
-    # u = tf.add(u0, tf.multiply(x, k_u))
-    # v = tf.add(v0, tf.multiply(y, k_v))
-    u = tf.add(u0, tf.scalar_mul(k_u, x))
-    v = tf.add(v0, tf.scalar_mul(k_v, y))
+    k_u = tf.tile(tf.expand_dims(k_u, axis=1), [1, 6890])
+    k_v = tf.tile(tf.expand_dims(k_v, axis=1), [1, 6890])
+    u = tf.add(u0, tf.multiply(x, k_u))
+    v = tf.add(v0, tf.multiply(y, k_v))
+    # u = tf.add(u0, tf.scalar_mul(k_u, x))
+    # v = tf.add(v0, tf.scalar_mul(k_v, y))
     pixel_coords = tf.stack([u, v], axis=2)
 
     return pixel_coords
@@ -56,8 +59,8 @@ def orthographic_project(verts):
     :return:
     """
     img_wh = 64
-    k_u = 30.0
-    k_v = 30.0
+    k_u = 35.0
+    k_v = 35.0
     u0 = img_wh / 2.0
     v0 = img_wh / 2.0
     # T1 = tf.expand_dims(tf.constant(0.0), axis=0)

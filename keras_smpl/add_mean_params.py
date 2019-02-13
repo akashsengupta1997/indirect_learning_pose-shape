@@ -10,8 +10,8 @@ import deepdish as dd
 
 def add_mean_params(smpl_diff):
     mean = np.zeros((1, 87))
-    mean[0, 0] = 10.0
-    mean[0, 1] = 10.0
+    mean[0, 0] = 250.0
+    mean[0, 1] = 250.0
     mean[0, 2] = 0.0
     mean[0, 3] = 0.0
     mean[0, 4] = 10.0

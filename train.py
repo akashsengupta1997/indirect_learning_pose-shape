@@ -18,8 +18,8 @@ from renderer import SMPLRenderer
 
 def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes,
                 encoder_architecture='resnet50'):
-    # num_camera_params = 5
-    num_smpl_params = 72 + 10
+    num_camera_params = 5
+    num_smpl_params = 72 + 10 + num_camera_params
 
     if encoder_architecture == 'enet':
         inp = Input(shape=input_shape)
@@ -37,9 +37,10 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
     encoder = BatchNormalization()(encoder)
 
     smpl = Dense(num_smpl_params, activation='linear')(encoder)
+    smpl = Lambda(add_mean_params)(smpl)
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(smpl)
-    # projects = Lambda(persepective_project, name='projection')(verts)
-    projects = Lambda(orthographic_project, name='projection')(verts)
+    projects = Lambda(persepective_project, name='projection')([verts, smpl])
+    # projects = Lambda(orthographic_project, name='projection')(verts)
     segs = Lambda(projects_to_seg, name='segmentation')(projects)
     segs = Reshape((output_img_wh * output_img_wh, num_classes))(segs)
     segs = Activation('softmax')(segs)
