@@ -59,13 +59,12 @@ def orthographic_project(verts):
     k_u = 32.0
     k_v = 32.0
     u0 = img_wh / 2.0
-    v0 = img_wh / 2.0
+    v0 = img_wh / 2.0 + 10
 
     k_u = tf.constant(k_u, dtype='float32')
     k_v = tf.constant(k_v, dtype='float32')
     u0 = tf.constant(u0, dtype='float32')
     v0 = tf.constant(v0, dtype='float32')
-
 
     # T1 = tf.expand_dims(tf.constant(0.0), axis=0)
     # T2 = tf.expand_dims(tf.constant(0.0), axis=0)
