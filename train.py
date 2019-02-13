@@ -6,6 +6,7 @@ from keras.models import Model
 from keras.layers import Input, Flatten, Dense, Lambda, Reshape, Conv2D, MaxPooling2D, \
     BatchNormalization, Activation
 from keras.preprocessing.image import ImageDataGenerator
+from keras.applications import resnet50
 
 from keras_smpl.batch_smpl import SMPLLayer
 from keras_smpl.projection import persepective_project, orthographic_project
@@ -15,14 +16,21 @@ from encoders.encoder_enet_simple import build_enet
 from renderer import SMPLRenderer
 
 
-def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes):
+def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes,
+                encoder='resnet50'):
     # num_camera_params = 5
     num_smpl_params = 72 + 10
 
-    inp = Input(shape=input_shape)
-    enet = build_enet(inp)  # (N, 32, 32, 128) output size from enet
+    if encoder == 'enet':
+        inp = Input(shape=input_shape)
+        encoder = build_enet(inp)  # (N, 32, 32, 128) output size from enet
 
-    enet = Flatten()(enet)
+    elif encoder == 'resnet50':
+        resnet = resnet50.ResNet50(include_top=False, weights=None, input_shape=input_shape)
+        inp = resnet.input
+        encoder = resnet.output
+
+    enet = Flatten()(encoder)
     enet = Dense(2048, activation='relu')(enet)
     enet = BatchNormalization()(enet)
     enet = Dense(128, activation='tanh')(enet)
