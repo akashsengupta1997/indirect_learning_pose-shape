@@ -17,25 +17,26 @@ from renderer import SMPLRenderer
 
 
 def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes,
-                encoder='resnet50'):
+                encoder_architecture='resnet50'):
     # num_camera_params = 5
     num_smpl_params = 72 + 10
 
-    if encoder == 'enet':
+    if encoder_architecture == 'enet':
         inp = Input(shape=input_shape)
         encoder = build_enet(inp)  # (N, 32, 32, 128) output size from enet
 
-    elif encoder == 'resnet50':
+    elif encoder_architecture == 'resnet50':
         resnet = resnet50.ResNet50(include_top=False, weights=None, input_shape=input_shape)
         inp = resnet.input
         encoder = resnet.output
 
-    enet = Flatten()(encoder)
-    enet = Dense(2048, activation='relu')(enet)
-    enet = BatchNormalization()(enet)
-    enet = Dense(1024, activation='relu')(enet)
-    enet = BatchNormalization()(enet)
-    smpl = Dense(num_smpl_params, activation='linear')(enet)
+    encoder = Flatten()(encoder_architecture)
+    encoder = Dense(2048, activation='relu')(encoder)
+    encoder = BatchNormalization()(encoder)
+    encoder = Dense(1024, activation='relu')(encoder)
+    encoder = BatchNormalization()(encoder)
+
+    smpl = Dense(num_smpl_params, activation='linear')(encoder)
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(smpl)
     # projects = Lambda(persepective_project, name='projection')(verts)
     projects = Lambda(orthographic_project, name='projection')(verts)
