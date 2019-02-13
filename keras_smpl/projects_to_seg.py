@@ -33,6 +33,7 @@ def projects_to_seg(projects):
     for part in range(len(part_indices)):
         indices = part_indices[part]
         num_indices = len(indices)
+        indices = tf.constant(indices, dtype='int32')
         part_projects = tf.gather(projects, indices, axis=1)  # N x num_indices x 2
         part_projects = tf.tile(tf.expand_dims(part_projects, axis=1),
                                 [1, img_wh*img_wh, 1, 1])  # N x img_wh^2 x num_indices x 2
