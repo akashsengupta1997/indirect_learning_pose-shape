@@ -45,7 +45,7 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
     # Instantiate ief layers
     IEF_layer_1 = Dense(1024, activation='relu', name='IEF_layer_1')
     IEF_layer_2 = Dense(1024, activation='relu', name='IEF_layer_2')
-    IEF_layer_3 = Dense(num_smpl_params, activation='linear', name='IEF_layer_3')
+    IEF_layer_3 = Dense(num_smpl_params, activation='tanh', name='IEF_layer_3')
 
     # Load mean params and set initial state to concatenation of image features and mean params
     state1, param1 = Lambda(concat_mean_param)(img_features)
