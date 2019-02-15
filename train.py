@@ -9,6 +9,7 @@ from keras.layers import Input, Dense, Lambda, Reshape, Conv2D, MaxPooling2D, \
     BatchNormalization, Activation, Add, Concatenate
 from keras.preprocessing.image import ImageDataGenerator
 from keras.applications import resnet50
+from keras.optimizers import Adam
 
 from keras_smpl.batch_smpl import SMPLLayer
 from keras_smpl.projection import persepective_project, orthographic_project
@@ -272,8 +273,9 @@ def train(img_wh, output_img_wh, dataset):
                                        "./neutral_smpl_with_cocoplus_reg.pkl",
                                        output_img_wh,
                                        num_classes)
+    adam_optimiser = Adam(lr=0.0001)
     indirect_learn_model.compile(loss='categorical_crossentropy',
-                                 optimizer='Adam',
+                                 optimizer=adam_optimiser,
                                  metrics=['accuracy'])
 
     print("Model compiled.")
