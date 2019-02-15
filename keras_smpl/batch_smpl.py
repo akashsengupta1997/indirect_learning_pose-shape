@@ -25,7 +25,6 @@ class SMPLLayer(Layer):
         self.pkl_path = pkl_path
         self.dtype = dtype
         self.batch_size = batch_size
-
         super(SMPLLayer, self).__init__(**kwargs)
 
     def build(self, input_shape):
@@ -89,6 +88,8 @@ class SMPLLayer(Layer):
 
         thetas = x[:, :self.num_thetas]
         betas = x[:, self.num_thetas:]
+        print(tf.shape(x)[0])
+        batch_size = tf.shape(x)[0]
 
         # thetas = x[:, self.num_cam:(self.num_thetas+self.num_cam)]
         # betas = x[:, (self.num_cam + self.num_thetas):]
@@ -245,8 +246,6 @@ class SMPLLayer(Layer):
         Output rodrigues angle matrices are N*K x 3 x 3.
 
         """
-        # input_size = theta.shape.as_list()[0]
-        # print(theta.shape.as_list())
         input_size = batch_size * self.num_joints
 
         angle = K.expand_dims(tf.norm(theta + 1e-8, axis=1), -1)
