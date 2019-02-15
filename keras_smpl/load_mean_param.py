@@ -34,11 +34,11 @@ def concat_mean_param(img_features):
     mean_pose[:3] = 0.
     mean_shape = mean_vals['shape']
 
-    # # This initializes the global pose to be up-right when projected
+    # This initializes the global pose to be up-right when projected
     # mean_pose[0] = np.pi
 
     mean = np.expand_dims(np.hstack((mean_pose, mean_shape)), axis=0)
-    mean = np.zeros((1, 82))
+    # mean = np.zeros((1, 82))
     mean = tf.constant(mean, dtype='float32')
     # print(mean.shape)
     mean = tf.tile(mean, [K.shape(img_features)[0], 1])

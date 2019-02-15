@@ -55,7 +55,7 @@ def projects_to_seg(projects):
     # segs.insert(0, silhouettes)
     output_segs = tf.concat([tf.expand_dims(silhouettes, axis=3), stacked_segs],
                             axis=3)  # N x img_wh x img_wh x 32
-    output_segs = K.reverse(output_segs, axes=1)  # Flip image vertically
+    output_segs = tf.reverse(output_segs, axis=[1])  # Flip image vertically
     return output_segs
 
     # scores_hand = []
