@@ -102,7 +102,7 @@ def train(output_wh, num_classes, num_indices):
 
     segs_model.compile(optimizer="adam", loss='categorical_crossentropy', metrics=['accuracy'])
 
-    for trial in range(2000):
+    for trial in range(4001):
         print "Epoch", trial
         segs_model.fit(train_indices, train_labels, batch_size=15, verbose=1)
 
