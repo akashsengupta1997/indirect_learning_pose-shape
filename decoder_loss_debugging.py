@@ -63,13 +63,13 @@ def load_masks_from_indices(indices, output_shape):
     return labels
 
 
-def build_debug_model(batch_size, smpl_path, output_img_wh, num_classes):
+def build_debug_model(batch_size, smpl_path, output_img_wh, num_classes, num_indices):
     num_camera_params = 4
     num_smpl_params = 72 + 10
     num_total_params = num_smpl_params + num_camera_params
 
     index_inputs = Input(shape=(1,))
-    smpls = Embedding(2, num_total_params, input_length=1)(index_inputs)
+    smpls = Embedding(num_indices, num_total_params, input_length=1)(index_inputs)
     smpls = Lambda(lambda smpls: K.squeeze(smpls, axis=1))(smpls)
     smpls = Lambda(set_cam_params)(smpls)
 
@@ -90,53 +90,53 @@ def build_debug_model(batch_size, smpl_path, output_img_wh, num_classes):
     return segs_model, smpl_model, verts_model, projects_model
 
 
-def train(output_wh, num_classes):
-    train_indices = np.array([1])
+def train(output_wh, num_classes, num_indices):
+    train_indices = np.arange(num_indices)
     labels = load_masks_from_indices(train_indices, (output_wh, output_wh))
     train_labels = np.reshape(labels, (-1, output_wh*output_wh, num_classes))
-    segs_model, smpl_model, verts_model, projects_model = build_debug_model(1,
+    segs_model, smpl_model, verts_model, projects_model = build_debug_model(15,
                                                                             "./neutral_smpl_with_cocoplus_reg.pkl",
-                                                                            64,
-                                                                            32)
+                                                                            output_wh,
+                                                                            num_classes,
+                                                                            num_indices)
 
     segs_model.compile(optimizer="adam", loss='categorical_crossentropy', metrics=['accuracy'])
 
     for trial in range(2000):
         print "Epoch", trial
-        segs_model.fit(train_indices, train_labels, batch_size=1, verbose=1)
+        segs_model.fit(train_indices, train_labels, batch_size=15, verbose=1)
 
         renderer = SMPLRenderer()
 
         if trial % 50 == 0:
-            gt_seg = np.argmax(labels[0], axis=-1)
-            test_seg = segs_model.predict(train_indices, batch_size=1)
-            test_seg = np.argmax(np.reshape(test_seg[0], (output_wh, output_wh, num_classes)), axis=-1)
-            test_projects = projects_model.predict(train_indices, batch_size=1)
-            test_smpl = smpl_model.predict(train_indices, batch_size=1)
-            test_verts = verts_model.predict(train_indices, batch_size=1)
+            test_segs = segs_model.predict(train_indices, batch_size=15)
+            test_projects = projects_model.predict(train_indices, batch_size=15)
+            test_smpls = smpl_model.predict(train_indices, batch_size=15)
+            test_verts = verts_model.predict(train_indices, batch_size=15)
 
-            print(test_smpl)
-
-            plt.figure(1)
-            plt.clf()
-            plt.imshow(test_seg)
-            plt.savefig("./test_outputs/seg_" + str(trial) + ".png")
-            plt.figure(2)
-            plt.clf()
-            plt.scatter(test_projects[0, :, 0], test_projects[0, :, 1], s=1)
-            plt.gca().set_aspect('equal', adjustable='box')
-            plt.savefig("./test_outputs/verts_" + str(trial) + ".png")
-            plt.figure(3)
-            rend_img = renderer(verts=test_verts[0], render_seg=False)
-            plt.imshow(rend_img)
-            plt.savefig("./test_outputs/rend_" + str(trial) + ".png")
-
-            if trial == 0:
-                plt.figure(4)
+            for idx in range(num_indices):
+                test_seg = np.argmax(np.reshape(test_segs[idx], (output_wh, output_wh, num_classes)), axis=-1)
+                plt.figure(1)
                 plt.clf()
-                plt.imshow(gt_seg)
-                plt.savefig("./test_outputs/gt_seg.png")
+                plt.imshow(test_seg)
+                plt.savefig("./test_outputs/seg_" + str(trial) + "_" + str(idx) + ".png")
+                plt.figure(2)
+                plt.clf()
+                plt.scatter(test_projects[idx, :, 0], test_projects[idx, :, 1], s=1)
+                plt.gca().set_aspect('equal', adjustable='box')
+                plt.savefig("./test_outputs/verts_" + str(trial) + "_" + str(idx) + ".png")
+                plt.figure(3)
+                rend_img = renderer(verts=test_verts[idx], render_seg=False)
+                plt.imshow(rend_img)
+                plt.savefig("./test_outputs/rend_" + str(trial) + "_" + str(idx) + ".png")
+
+                if trial == 0:
+                    gt_seg = np.argmax(labels[idx], axis=-1)
+                    plt.figure(4)
+                    plt.clf()
+                    plt.imshow(gt_seg)
+                    plt.savefig("./test_outputs/gt_seg_" + str(idx) + ".png")
 
 
 
-train(64, 32)
+train(64, 32, 15)

@@ -96,6 +96,8 @@ def orthographic_project2(inputs):
     y_proj = verts[:, :, 1]
     k_u = tf.tile(tf.expand_dims(k_u, axis=1), [1, 6890])
     k_v = tf.tile(tf.expand_dims(k_v, axis=1), [1, 6890])
+    u0 = tf.tile(tf.expand_dims(u0, axis=1), [1, 6890])
+    v0 = tf.tile(tf.expand_dims(v0, axis=1), [1, 6890])
     u = tf.add(u0, tf.multiply(x_proj, k_u))
     v = tf.add(v0, tf.multiply(y_proj, k_v))
     pixel_coords = tf.stack([u, v], axis=2)

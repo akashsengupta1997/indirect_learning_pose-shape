@@ -5,7 +5,8 @@ from __future__ import print_function
 
 import tensorflow as tf
 import numpy as np
-import deepdish as dd
+
+from keras import backend as K
 
 
 def set_cam_params(smpl):
@@ -13,8 +14,8 @@ def set_cam_params(smpl):
     mean[0, 0] = 32.0
     mean[0, 1] = 32.0
     mean[0, 2] = 32.0
-    mean[0, 3] = 32.0
+    mean[0, 3] = 40.0
     mean = tf.constant(mean, tf.float32)
-    # mean = tf.tile(mean, [batch_size, 1])
+    mean = tf.tile(mean, [K.shape(smpl)[0], 1])
     output_smpl = tf.add(smpl, mean)
     return output_smpl
