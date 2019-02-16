@@ -107,6 +107,9 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
     projects_model = Model(inputs=inp, outputs=projects)
 
     print(segs_model.summary())
+    print(verts.get_shape())
+    print(projects.get_shape())
+    print(segs.get_shape())
 
     return segs_model, smpl_model, verts_model, projects_model
 
@@ -259,16 +262,18 @@ def train(img_wh, output_img_wh, dataset):
     # For testing data loading
     x = train_image_generator.next()
     y = train_mask_generator.next()
-    print('x shape in generate data', x.shape)  # should = (batch_size, img_hw, img_hw, 3)
-    print('y shape in generate data', y.shape)  # should = (batch_size, dec_hw, dec_hw, 1)
+    print('x shape out of training generator', x.shape)  # should = (batch_size, img_hw, img_hw, 3)
+    print('y shape out of training generator', y.shape)  # should = (batch_size, dec_hw, dec_hw, 1)
     plt.figure(1)
     plt.subplot(221)
     plt.imshow(x[0, :, :, :])
     plt.subplot(222)
     plt.imshow(y[0, :, :, 0])
-    # y_post = labels_from_seg_image(y)
-    # plt.subplot(223)
-    # plt.imshow(y_post[0, :, :, 0])
+    y_post = classlab(y[0], num_classes)
+    plt.subplot(223)
+    plt.imshow(y_post[:, :, 0])
+    plt.subplot(224)
+    plt.imshow(y_post[:, :, 13])
     plt.show()
 
     indirect_learn_model, smpl_test_model, verts_test_model, projects_test_model = build_model(1,

@@ -5,9 +5,8 @@ from matplotlib import pyplot as plt
 import tensorflow as tf
 from keras import backend as K
 from keras.models import Model
-from keras.layers import Input, Dense, Lambda, Reshape, Conv2D, MaxPooling2D, \
-    BatchNormalization, Activation, Add, Concatenate
-from keras.preprocessing.image import ImageDataGenerator
+from keras.layers import Input, Lambda, Reshape, Activation, Embedding
+from keras.preprocessing import image
 from keras.applications import resnet50
 from keras.optimizers import Adam
 
@@ -20,92 +19,104 @@ from encoders.encoder_enet_simple import build_enet
 from renderer import SMPLRenderer
 
 
-def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes,
-                encoder_architecture='resnet50'):
+def classlab(labels, num_classes):
+    """
+    Function to convert HxWx1 labels image to HxWxC one hot encoded matrix.
+    :param labels: HxWx1 labels image
+    :param num_classes: number of segmentation classes
+    :return: HxWxC one hot encoded matrix.
+    """
+    x = np.zeros((labels.shape[0], labels.shape[1], num_classes))
+    # print('IN CLASSLAB', labels.shape)
+    for pixel_class in range(num_classes):
+        indexes = list(zip(*np.where(labels == pixel_class)))
+        for index in indexes:
+            x[index[0], index[1], pixel_class] = 1.0
+    return x
+
+
+def load_masks_from_indices(indices, output_shape):
+    masks_folder = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded/masks/train"
+    labels = []
+    for index in list(indices):
+        mask_name = str(index).zfill(5) + "_ann.png"
+        mask_path = os.path.join(masks_folder, mask_name)
+        mask = image.load_img(mask_path, grayscale=True, target_size=output_shape)
+        mask = image.img_to_array(mask)
+        OHE_label = classlab(mask, 32)
+        labels.append(OHE_label)
+
+    # labels = np.array(labels)
+    # print(labels.shape)
+    # plt.figure(1)
+    # plt.subplot(221)
+    # plt.imshow(labels[0, :, :, 0])
+    # plt.subplot(222)
+    # plt.imshow(labels[0, :, :, 10])
+    # plt.subplot(223)
+    # plt.imshow(labels[0, :, :, 20])
+    # plt.subplot(224)
+    # plt.imshow(labels[0, :, :, 30])
+    # plt.show()
+
+    return labels
+
+
+def build_debug_model(batch_size, smpl_path, output_img_wh, num_classes):
     # num_camera_params = 5
     num_smpl_params = 72 + 10
 
-    # --- BACKBONE ---
-    if encoder_architecture == 'enet':
-        inp = Input(shape=input_shape)
-        img_features = build_enet(inp)  # (N, 32, 32, 128) output size from enet
+    index_inputs = Input(shape=(1,))
+    smpls = Embedding(2, num_smpl_params, input_length=1)(index_inputs)
+    smpls = Lambda(lambda smpls: K.squeeze(smpls, axis=1))(smpls)
 
-    elif encoder_architecture == 'resnet50':
-        resnet = resnet50.ResNet50(include_top=False, weights=None, input_shape=input_shape)
-        inp = resnet.input
-        img_features = resnet.output
-
-        print('resnet shape')
-        print(img_features.get_shape())
-        # img_features = Flatten()(img_features)
-        img_features = Reshape((2048,))(img_features)
-        print('post reshape shape')
-        print(img_features.get_shape())
-
-    # --- IEF MODULE ---
-    # Instantiate ief layers
-    IEF_layer_1 = Dense(1024, activation='relu', name='IEF_layer_1')
-    IEF_layer_2 = Dense(1024, activation='relu', name='IEF_layer_2')
-    IEF_layer_3 = Dense(num_smpl_params, activation='linear', name='IEF_layer_3')
-
-    # Load mean params and set initial state to concatenation of image features and mean params
-    state1, param1 = Lambda(concat_mean_param)(img_features)
-    print('sanity check (same as above')
-    print(img_features.get_shape())
-    print('mean params shape')
-    print(param1.get_shape())
-    print('state1 shape')
-    print(state1.get_shape())
-
-    # Iteration 1
-    delta1 = IEF_layer_1(state1)
-    delta1 = IEF_layer_2(delta1)
-    delta1 = IEF_layer_3(delta1)
-    param2 = Add()([param1, delta1])
-    state2 = Concatenate()([img_features, param2])
-    print('param2 shape')
-    print(param2.get_shape())
-    print('state2 shape')
-    print(state2.get_shape())
-
-    # Iteration 2
-    delta2 = IEF_layer_1(state2)
-    delta2 = IEF_layer_2(delta2)
-    delta2 = IEF_layer_3(delta2)
-    param3 = Add()([param2, delta2])
-    state3 = Concatenate()([img_features, param3])
-    print('param3 shape')
-    print(param3.get_shape())
-    print('state3 shape')
-    print(state3.get_shape())
-
-    # Iteration 3
-    delta3 = IEF_layer_1(state3)
-    delta3 = IEF_layer_2(delta3)
-    delta3 = IEF_layer_3(delta3)
-    final_param = Add()([param3, delta3])
-    print('final param shape')
-    print(final_param.get_shape())
-
-    # encoder = Dense(2048, activation='relu')(img_features)
-    # encoder = BatchNormalization()(encoder)
-    # encoder = Dense(1024, activation='relu')(encoder)
-    # encoder = BatchNormalization()(encoder)
-    # smpl = Dense(num_smpl_params, activation='tanh')(encoder)
-    # # smpl = Lambda(add_mean_params)(smpl)
-
-    verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
+    verts = SMPLLayer(smpl_path, batch_size=batch_size)(smpls)
     # projects = Lambda(persepective_project, name='projection')([verts, smpl])
     projects = Lambda(orthographic_project, name='projection')(verts)
     segs = Lambda(projects_to_seg, name='segmentation')(projects)
     segs = Reshape((output_img_wh * output_img_wh, num_classes))(segs)
     segs = Activation('softmax')(segs)
 
-    segs_model = Model(inputs=inp, outputs=segs)
-    smpl_model = Model(inputs=inp, outputs=final_param)
-    verts_model = Model(inputs=inp, outputs=verts)
-    projects_model = Model(inputs=inp, outputs=projects)
+    segs_model = Model(inputs=index_inputs, outputs=segs)
+    smpl_model = Model(inputs=index_inputs, outputs=smpls)
+    verts_model = Model(inputs=index_inputs, outputs=verts)
+    projects_model = Model(inputs=index_inputs, outputs=projects)
 
     print(segs_model.summary())
 
     return segs_model, smpl_model, verts_model, projects_model
+
+
+def train(output_wh, num_classes):
+    train_indices = np.array([1])
+    labels = load_masks_from_indices(train_indices, (output_wh, output_wh))
+    train_labels = np.reshape(labels, (-1, output_wh*output_wh, num_classes))
+    segs_model, smpl_model, verts_model, projects_model = build_debug_model(1,
+                                                                            "./neutral_smpl_with_cocoplus_reg.pkl",
+                                                                            64,
+                                                                            32)
+
+    segs_model.compile(optimizer="adam", loss='categorical_crossentropy', metrics=['accuracy'])
+
+    for trial in range(2000):
+        print "Epoch", trial
+        segs_model.fit(train_indices, train_labels, batch_size=1, verbose=1)
+
+        if trial % 10 == 0:
+            gt_seg = np.argmax(labels[0], axis=-1)
+            test_seg = segs_model.predict(train_indices, batch_size=1)
+            test_seg = np.argmax(np.reshape(test_seg[0], (output_wh, output_wh, num_classes)), axis=-1)
+            test_projects = projects_model.predict(train_indices, batch_size=1)
+            test_smpl = smpl_model.predict(train_indices, batch_size=1)
+            print(test_smpl)
+            plt.figure(1)
+            plt.clf()
+            plt.imshow(test_seg)
+            plt.savefig("./test_outputs/seg_" + str(trial) + ".png")
+            plt.figure(2)
+            plt.clf()
+            plt.scatter(test_projects[0, :, 0], test_projects[0, :, 1], s=1)
+            plt.gca().set_aspect('equal', adjustable='box')
+            plt.savefig("./test_outputs/verts_" + str(trial) + ".png")
+
+train(64, 32)

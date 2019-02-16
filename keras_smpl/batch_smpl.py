@@ -88,8 +88,6 @@ class SMPLLayer(Layer):
 
         thetas = x[:, :self.num_thetas]
         betas = x[:, self.num_thetas:]
-        print(tf.shape(x)[0])
-        batch_size = tf.shape(x)[0]
 
         # thetas = x[:, self.num_cam:(self.num_thetas+self.num_cam)]
         # betas = x[:, (self.num_cam + self.num_thetas):]
