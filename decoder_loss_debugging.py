@@ -11,9 +11,10 @@ from keras.applications import resnet50
 from keras.optimizers import Adam
 
 from keras_smpl.batch_smpl import SMPLLayer
-from keras_smpl.projection import persepective_project, orthographic_project
+from keras_smpl.projection import persepective_project, orthographic_project, \
+    orthographic_project2
 from keras_smpl.projects_to_seg import projects_to_seg
-from keras_smpl.add_mean_params import add_mean_params
+from keras_smpl.set_cam_params import set_cam_params
 from keras_smpl.load_mean_param import load_mean_param, concat_mean_param
 from encoders.encoder_enet_simple import build_enet
 from renderer import SMPLRenderer
@@ -63,16 +64,18 @@ def load_masks_from_indices(indices, output_shape):
 
 
 def build_debug_model(batch_size, smpl_path, output_img_wh, num_classes):
-    # num_camera_params = 5
+    num_camera_params = 4
     num_smpl_params = 72 + 10
+    num_total_params = num_smpl_params + num_camera_params
 
     index_inputs = Input(shape=(1,))
-    smpls = Embedding(2, num_smpl_params, input_length=1)(index_inputs)
+    smpls = Embedding(2, num_total_params, input_length=1)(index_inputs)
     smpls = Lambda(lambda smpls: K.squeeze(smpls, axis=1))(smpls)
+    smpls = Lambda(set_cam_params)(smpls)
 
     verts = SMPLLayer(smpl_path, batch_size=batch_size)(smpls)
     # projects = Lambda(persepective_project, name='projection')([verts, smpl])
-    projects = Lambda(orthographic_project, name='projection')(verts)
+    projects = Lambda(orthographic_project2, name='projection')([verts, smpls])
     segs = Lambda(projects_to_seg, name='segmentation')(projects)
     segs = Reshape((output_img_wh * output_img_wh, num_classes))(segs)
     segs = Activation('softmax')(segs)

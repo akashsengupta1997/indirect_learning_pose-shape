@@ -78,3 +78,26 @@ def orthographic_project(verts):
     pixel_coords = tf.stack([u, v], axis=2)
 
     return pixel_coords
+
+
+def orthographic_project2(inputs):
+    """
+
+    :param verts:
+    :return:
+    """
+    verts, smpl = inputs
+    k_u = smpl[:, 0]
+    k_v = smpl[:, 1]
+    u0 = smpl[:, 2]
+    v0 = smpl[:, 3]
+
+    x_proj = verts[:, :, 0]
+    y_proj = verts[:, :, 1]
+    k_u = tf.tile(tf.expand_dims(k_u, axis=1), [1, 6890])
+    k_v = tf.tile(tf.expand_dims(k_v, axis=1), [1, 6890])
+    u = tf.add(u0, tf.multiply(x_proj, k_u))
+    v = tf.add(v0, tf.multiply(y_proj, k_v))
+    pixel_coords = tf.stack([u, v], axis=2)
+
+    return pixel_coords

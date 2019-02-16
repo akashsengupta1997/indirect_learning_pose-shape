@@ -14,7 +14,7 @@ from keras.optimizers import Adam
 from keras_smpl.batch_smpl import SMPLLayer
 from keras_smpl.projection import persepective_project, orthographic_project
 from keras_smpl.projects_to_seg import projects_to_seg
-from keras_smpl.add_mean_params import add_mean_params
+from keras_smpl.set_cam_params import set_cam_params
 from keras_smpl.load_mean_param import load_mean_param, concat_mean_param
 from encoders.encoder_enet_simple import build_enet
 from renderer import SMPLRenderer
