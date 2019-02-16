@@ -35,18 +35,18 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
         inp = resnet.input
         img_features = resnet.output
 
-    print('resnet shape')
-    print(img_features.get_shape())
-    # img_features = Flatten()(img_features)
-    img_features = Reshape((2048,))(img_features)
-    print('post reshape shape')
-    print(img_features.get_shape())
+        print('resnet shape')
+        print(img_features.get_shape())
+        # img_features = Flatten()(img_features)
+        img_features = Reshape((2048,))(img_features)
+        print('post reshape shape')
+        print(img_features.get_shape())
 
     # --- IEF MODULE ---
     # Instantiate ief layers
     IEF_layer_1 = Dense(1024, activation='relu', name='IEF_layer_1')
     IEF_layer_2 = Dense(1024, activation='relu', name='IEF_layer_2')
-    IEF_layer_3 = Dense(num_smpl_params, activation='tanh', name='IEF_layer_3')
+    IEF_layer_3 = Dense(num_smpl_params, activation='linear', name='IEF_layer_3')
 
     # Load mean params and set initial state to concatenation of image features and mean params
     state1, param1 = Lambda(concat_mean_param)(img_features)
@@ -110,7 +110,10 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
 
     return segs_model, smpl_model, verts_model, projects_model
 
-
+# TODO embedding layer that gives smpl parameters for input image id
+# TODO decoder takes in smpl parameters and outputs body part segmentation
+# TODO embedding layer learns to give smpl outputs
+# TODO do this to debug decoder and loss
 def convert_to_seg_predict(model, smpl_path):
     """
     Converts training indirect learning model to test model that outputs part segmentation.
@@ -273,7 +276,7 @@ def train(img_wh, output_img_wh, dataset):
                                        "./neutral_smpl_with_cocoplus_reg.pkl",
                                        output_img_wh,
                                        num_classes)
-    adam_optimiser = Adam(lr=0.0001)
+    adam_optimiser = Adam(lr=0.0005)
     indirect_learn_model.compile(loss='categorical_crossentropy',
                                  optimizer=adam_optimiser,
                                  metrics=['accuracy'])
@@ -313,7 +316,7 @@ def train(img_wh, output_img_wh, dataset):
 
 
         # TODO remove this testing code
-        test_data, _ = generate_data(train_image_generator,
+        test_data, test_gt = generate_data(train_image_generator,
                                      train_mask_generator,
                                      1,
                                      num_classes,
@@ -325,6 +328,9 @@ def train(img_wh, output_img_wh, dataset):
             test_seg = np.reshape(indirect_learn_model.predict(test_data),
                                   (1, output_img_wh, output_img_wh, num_classes))
             test_seg_map = np.argmax(test_seg[0], axis=-1)
+            test_gt_seg_map = np.argmax(np.reshape(test_gt[0],
+                                                   (output_img_wh, output_img_wh,
+                                                    num_classes)), axis=-1)
             renderer = SMPLRenderer()
             rend_img_keras_model = renderer(verts=test_verts[0], render_seg=False)
             plt.figure(1)
@@ -340,6 +346,13 @@ def train(img_wh, output_img_wh, dataset):
             plt.clf()
             plt.imshow(test_seg_map)
             plt.savefig("./test_outputs/seg_" + str(trials) + ".png")
+
+            if trials == 0:
+                plt.figure(5)
+                plt.clf()
+                plt.imshow(test_gt_seg_map)
+                plt.savefig("./test_outputs/gt_seg.png")
+
             # plt.show()
 
         # if trials % 100 == 0:
