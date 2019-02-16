@@ -108,12 +108,12 @@ def train(output_wh, num_classes, num_indices):
 
         renderer = SMPLRenderer()
 
-        if trial % 50 == 0:
+        if trial % 200 == 0:
             test_segs = segs_model.predict(train_indices, batch_size=15)
             test_projects = projects_model.predict(train_indices, batch_size=15)
             test_smpls = smpl_model.predict(train_indices, batch_size=15)
             test_verts = verts_model.predict(train_indices, batch_size=15)
-
+            print(test_smpls[0])
             for idx in range(num_indices):
                 test_seg = np.argmax(np.reshape(test_segs[idx], (output_wh, output_wh, num_classes)), axis=-1)
                 plt.figure(1)
