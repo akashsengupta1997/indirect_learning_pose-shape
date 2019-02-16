@@ -105,13 +105,18 @@ def train(output_wh, num_classes):
         print "Epoch", trial
         segs_model.fit(train_indices, train_labels, batch_size=1, verbose=1)
 
-        if trial % 10 == 0:
+        renderer = SMPLRenderer()
+
+        if trial % 50 == 0:
             gt_seg = np.argmax(labels[0], axis=-1)
             test_seg = segs_model.predict(train_indices, batch_size=1)
             test_seg = np.argmax(np.reshape(test_seg[0], (output_wh, output_wh, num_classes)), axis=-1)
             test_projects = projects_model.predict(train_indices, batch_size=1)
             test_smpl = smpl_model.predict(train_indices, batch_size=1)
+            test_verts = verts_model.predict(train_indices, batch_size=1)
+
             print(test_smpl)
+
             plt.figure(1)
             plt.clf()
             plt.imshow(test_seg)
@@ -121,5 +126,17 @@ def train(output_wh, num_classes):
             plt.scatter(test_projects[0, :, 0], test_projects[0, :, 1], s=1)
             plt.gca().set_aspect('equal', adjustable='box')
             plt.savefig("./test_outputs/verts_" + str(trial) + ".png")
+            plt.figure(3)
+            rend_img = renderer(verts=test_verts[0], render_seg=False)
+            plt.imshow(rend_img)
+            plt.savefig("./test_outputs/rend_" + str(trial) + ".png")
+
+            if trial == 0:
+                plt.figure(4)
+                plt.clf()
+                plt.imshow(gt_seg)
+                plt.savefig("./test_outputs/gt_seg.png")
+
+
 
 train(64, 32)
