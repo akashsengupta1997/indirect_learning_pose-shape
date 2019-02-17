@@ -96,7 +96,7 @@ def train(output_wh, num_classes, num_indices):
     train_indices = np.arange(num_indices)
     labels = load_masks_from_indices(train_indices, (output_wh, output_wh))
     train_labels = np.reshape(labels, (-1, output_wh*output_wh, num_classes))
-    segs_model, smpl_model, verts_model, projects_model = build_debug_model(12,
+    segs_model, smpl_model, verts_model, projects_model = build_debug_model(6,
                                                                             "./neutral_smpl_with_cocoplus_reg.pkl",
                                                                             output_wh,
                                                                             num_classes,
@@ -107,15 +107,15 @@ def train(output_wh, num_classes, num_indices):
 
     for trial in range(1601):
         print "Epoch", trial
-        segs_model.fit(train_indices, train_labels, batch_size=12, verbose=1)
+        segs_model.fit(train_indices, train_labels, batch_size=num_indices, verbose=1)
 
         renderer = SMPLRenderer()
 
         if trial % 100 == 0:
-            test_segs = segs_model.predict(train_indices, batch_size=12)
-            test_projects = projects_model.predict(train_indices, batch_size=12)
-            test_smpls = smpl_model.predict(train_indices, batch_size=12)
-            test_verts = verts_model.predict(train_indices, batch_size=12)
+            test_segs = segs_model.predict(train_indices, batch_size=num_indices)
+            test_projects = projects_model.predict(train_indices, batch_size=num_indices)
+            test_smpls = smpl_model.predict(train_indices, batch_size=num_indices)
+            test_verts = verts_model.predict(train_indices, batch_size=num_indices)
             print(test_smpls[0])
             for idx in range(num_indices):
                 test_seg = np.argmax(np.reshape(test_segs[idx], (output_wh, output_wh, num_classes)), axis=-1)
@@ -142,4 +142,4 @@ def train(output_wh, num_classes, num_indices):
 
 
 
-train(128, 32, 12)
+train(128, 32, 6)
