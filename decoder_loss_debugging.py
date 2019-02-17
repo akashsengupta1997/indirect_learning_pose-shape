@@ -102,13 +102,13 @@ def train(output_wh, num_classes, num_indices):
 
     segs_model.compile(optimizer="adam", loss='categorical_crossentropy', metrics=['accuracy'])
 
-    for trial in range(4001):
+    for trial in range(1601):
         print "Epoch", trial
         segs_model.fit(train_indices, train_labels, batch_size=15, verbose=1)
 
         renderer = SMPLRenderer()
 
-        if trial % 200 == 0:
+        if trial % 100 == 0:
             test_segs = segs_model.predict(train_indices, batch_size=15)
             test_projects = projects_model.predict(train_indices, batch_size=15)
             test_smpls = smpl_model.predict(train_indices, batch_size=15)
