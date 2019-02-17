@@ -19,6 +19,8 @@ from keras_smpl.load_mean_param import load_mean_param, concat_mean_param
 from encoders.encoder_enet_simple import build_enet
 from renderer import SMPLRenderer
 
+from focal_loss import categorical_focal_loss
+
 
 def classlab(labels, num_classes):
     """
@@ -100,7 +102,8 @@ def train(output_wh, num_classes, num_indices):
                                                                             num_classes,
                                                                             num_indices)
 
-    segs_model.compile(optimizer="adam", loss='categorical_crossentropy', metrics=['accuracy'])
+    # segs_model.compile(optimizer="adam", loss='categorical_crossentropy', metrics=['accuracy'])
+    segs_model.compile(optimizer="adam", loss=categorical_focal_loss(gamma=2.0), metrics=['accuracy'])
 
     for trial in range(1601):
         print "Epoch", trial
