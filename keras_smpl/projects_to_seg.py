@@ -17,7 +17,7 @@ def projects_to_seg(projects):
     :return:
     """
     part_indices_path = "./keras_smpl/part_vertices.pkl"
-    img_wh = 64
+    img_wh = 128
 
     with open(part_indices_path, 'rb') as f:
         part_indices = pickle.load(f)
