@@ -96,7 +96,7 @@ def train(output_wh, num_classes, num_indices):
     train_indices = np.arange(num_indices)
     labels = load_masks_from_indices(train_indices, (output_wh, output_wh))
     train_labels = np.reshape(labels, (-1, output_wh*output_wh, num_classes))
-    segs_model, smpl_model, verts_model, projects_model = build_debug_model(6,
+    segs_model, smpl_model, verts_model, projects_model = build_debug_model(2,
                                                                             "./neutral_smpl_with_cocoplus_reg.pkl",
                                                                             output_wh,
                                                                             num_classes,
@@ -142,4 +142,4 @@ def train(output_wh, num_classes, num_indices):
 
 
 
-train(128, 32, 6)
+train(128, 32, 2)
