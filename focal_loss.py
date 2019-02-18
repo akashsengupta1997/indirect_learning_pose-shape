@@ -15,7 +15,8 @@ def categorical_focal_loss(gamma=2.0):
         y_pred = K.clip(y_pred, epsilon, 1. - epsilon)  # prevent Infs and NaNs by clipping
         cross_entropy = -y_true * K.log(y_pred)
         focal_loss = K.pow(1-y_pred, gamma) * cross_entropy
-        focal_loss = K.sum(focal_loss, axis=1)  # sum cross entropy over pixels
+        focal_loss = K.sum(focal_loss, axis=2)  # sum over classes dimension (only non zero value in sum is -log(correct class output)
+        print('FOCAL LOSS', focal_loss.get_shape())
         return focal_loss
 
     return categorical_focal_loss_fixed
