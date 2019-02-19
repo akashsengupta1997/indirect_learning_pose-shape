@@ -65,13 +65,13 @@ def load_masks_from_indices(indices, output_shape):
     return labels
 
 
-def build_debug_model(batch_size, smpl_path, output_img_wh, num_classes, num_indices):
+def build_debug_model(batch_size, smpl_path, output_img_wh, num_classes):
     num_camera_params = 4
     num_smpl_params = 72 + 10
     num_total_params = num_smpl_params + num_camera_params
 
     index_inputs = Input(shape=(1,))
-    smpls = Embedding(num_indices, num_total_params, input_length=1)(index_inputs)
+    smpls = Embedding(10, num_total_params, input_length=1)(index_inputs)
     smpls = Lambda(lambda smpls: K.squeeze(smpls, axis=1))(smpls)
     smpls = Lambda(load_mean_set_cam_params)(smpls)
 
@@ -93,14 +93,14 @@ def build_debug_model(batch_size, smpl_path, output_img_wh, num_classes, num_ind
 
 
 def train(output_wh, num_classes, num_indices):
-    train_indices = np.arange(num_indices)
+    # train_indices = np.arange(num_indices)
+    train_indices = np.array([2, 10, 11])
     labels = load_masks_from_indices(train_indices, (output_wh, output_wh))
     train_labels = np.reshape(labels, (-1, output_wh*output_wh, num_classes))
-    segs_model, smpl_model, verts_model, projects_model = build_debug_model(2,
+    segs_model, smpl_model, verts_model, projects_model = build_debug_model(num_indices,
                                                                             "./neutral_smpl_with_cocoplus_reg.pkl",
                                                                             output_wh,
-                                                                            num_classes,
-                                                                            num_indices)
+                                                                            num_classes)
 
     segs_model.compile(optimizer="adam", loss='categorical_crossentropy', metrics=['accuracy'])
     # segs_model.compile(optimizer="adam", loss=categorical_focal_loss(gamma=2.0), metrics=['accuracy'])
@@ -142,4 +142,4 @@ def train(output_wh, num_classes, num_indices):
 
 
 
-train(128, 32, 2)
+train(128, 32, 3)
