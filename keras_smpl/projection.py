@@ -44,9 +44,9 @@ def persepective_project(verts):
     # v = tf.add(v0, tf.multiply(y, k_v))
     u = tf.add(u0, tf.scalar_mul(k_u, x))
     v = tf.add(v0, tf.scalar_mul(k_v, y))
-    pixel_coords = tf.stack([u, v], axis=2)
+    project_coords = tf.stack([u, v], axis=2)
 
-    return pixel_coords
+    return project_coords
 
 
 def orthographic_project(verts):
@@ -75,9 +75,9 @@ def orthographic_project(verts):
     y_proj = verts[:, :, 1]
     u = tf.add(u0, tf.scalar_mul(k_u, x_proj))
     v = tf.add(v0, tf.scalar_mul(k_v, y_proj))
-    pixel_coords = tf.stack([u, v], axis=2)
+    project_coords = tf.stack([u, v], axis=2)
 
-    return pixel_coords
+    return project_coords
 
 
 def orthographic_project2(inputs):
@@ -94,12 +94,13 @@ def orthographic_project2(inputs):
 
     x_proj = verts[:, :, 0]
     y_proj = verts[:, :, 1]
+    z = verts[:, :, 2]
     k_u = tf.tile(tf.expand_dims(k_u, axis=1), [1, 6890])
     k_v = tf.tile(tf.expand_dims(k_v, axis=1), [1, 6890])
     u0 = tf.tile(tf.expand_dims(u0, axis=1), [1, 6890])
     v0 = tf.tile(tf.expand_dims(v0, axis=1), [1, 6890])
     u = tf.add(u0, tf.multiply(x_proj, k_u))
     v = tf.add(v0, tf.multiply(y_proj, k_v))
-    pixel_coords = tf.stack([u, v], axis=2)
+    project_coords_with_depth = tf.stack([u, v, z], axis=2)
 
-    return pixel_coords
+    return project_coords_with_depth

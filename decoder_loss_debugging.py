@@ -15,12 +15,27 @@ from keras_smpl.projection import persepective_project, orthographic_project, \
     orthographic_project2
 from keras_smpl.projects_to_seg import projects_to_seg
 from keras_smpl.set_cam_params import set_cam_params, load_mean_set_cam_params
+from keras_smpl.compute_mask import compute_mask
 from keras_smpl.load_mean_param import load_mean_param, concat_mean_param
 from encoders.encoder_enet_simple import build_enet
 from renderer import SMPLRenderer
 
 from focal_loss import categorical_focal_loss
+#TODO depth ordering - each point projects to a pixel - find this pixel using ceil
+#TODO look at all points that project to certain pixel - create mask by looking at which points are visible
 
+# look at shapes in projects to seg - can multiply by a 6890 x 1 mask? (or 6890 x 2)
+# output (u,v,z) instead of just (u,v) from projection
+# compute mask function:
+# input: (u,v,z) - N x 6890 x 3
+# output: N x 6890 mask => 1 if vertex visible, 1000 if vertex invisible
+# what it will do:
+# find which pixel each vertex will project to using round
+# make img_wh x img_wh list which contains the z-values and indices of vertices projected to each pixel
+# for the min z value at each pixel, set mask for that index to 1, set mask for other indices to 1000
+
+
+# TODO input seg map as input to encoder - use simple  + IEF
 
 def classlab(labels, num_classes):
     """
@@ -71,21 +86,21 @@ def build_debug_model(batch_size, smpl_path, output_img_wh, num_classes):
     num_total_params = num_smpl_params + num_camera_params
 
     index_inputs = Input(shape=(1,))
-    smpls = Embedding(10, num_total_params, input_length=1)(index_inputs)
+    smpls = Embedding(15, num_total_params, input_length=1)(index_inputs)
     smpls = Lambda(lambda smpls: K.squeeze(smpls, axis=1))(smpls)
     smpls = Lambda(load_mean_set_cam_params)(smpls)
 
     verts = SMPLLayer(smpl_path, batch_size=batch_size)(smpls)
-    # projects = Lambda(persepective_project, name='projection')([verts, smpl])
-    projects = Lambda(orthographic_project2, name='projection')([verts, smpls])
-    segs = Lambda(projects_to_seg, name='segmentation')(projects)
+    projects_with_depth = Lambda(orthographic_project2, name='projection')([verts, smpls])
+    masks = Lambda(compute_mask)(projects_with_depth)
+    segs = Lambda(projects_to_seg, name='segmentation')([projects_with_depth, masks])
     segs = Reshape((output_img_wh * output_img_wh, num_classes))(segs)
     segs = Activation('softmax')(segs)
 
     segs_model = Model(inputs=index_inputs, outputs=segs)
     smpl_model = Model(inputs=index_inputs, outputs=smpls)
     verts_model = Model(inputs=index_inputs, outputs=verts)
-    projects_model = Model(inputs=index_inputs, outputs=projects)
+    projects_model = Model(inputs=index_inputs, outputs=projects_with_depth)
 
     print(segs_model.summary())
 

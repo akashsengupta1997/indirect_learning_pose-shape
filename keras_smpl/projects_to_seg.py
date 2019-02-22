@@ -10,38 +10,48 @@ import pickle
 from keras import backend as K
 
 
-def projects_to_seg(projects):
+def projects_to_seg(input):
     """
 
     :param projects:
     :return:
     """
+    projects_with_depth, mask_vals = input
+
     part_indices_path = "./keras_smpl/part_vertices.pkl"
-    img_wh = 128
+    img_wh = 32
 
     with open(part_indices_path, 'rb') as f:
         part_indices = pickle.load(f)
 
+    projects = projects_with_depth[:, :, :2]
     i = tf.range(0, img_wh)
     j = tf.range(0, img_wh)
 
     t1, t2 = tf.meshgrid(i, j)
-    grid = tf.cast(tf.stack([t1, t2], axis=2), dtype='float32')
-    reshaped_grid = tf.reshape(grid, [-1, 2])
+    grid = tf.cast(tf.stack([t1, t2], axis=2), dtype='float32')  # img_wh x img_wh x 2
+    reshaped_grid = tf.reshape(grid, [-1, 2])  # img_wh^2 x 2
 
     segs = []
     for part in range(len(part_indices)):
         indices = part_indices[part]
         num_indices = len(indices)
         indices = tf.constant(indices, dtype='int32')
+
         part_projects = tf.gather(projects, indices, axis=1)  # N x num_indices x 2
         part_projects = tf.tile(tf.expand_dims(part_projects, axis=1),
                                 [1, img_wh*img_wh, 1, 1])  # N x img_wh^2 x num_indices x 2
+
+        part_mask_vals = tf.gather(mask_vals, indices, axis=1) # N x num_indices
+        part_mask_vals = tf.tile(tf.expand_dims(part_mask_vals, axis=1),
+                                 [1, img_wh*img_wh, 1])  # N x img_wh^2 x num_indices
+
         expanded_grid = tf.tile(tf.expand_dims(reshaped_grid, axis=1),
                                 [1, num_indices, 1])  # img_wh^2 x num_indices x 2
 
         diff = tf.subtract(part_projects, expanded_grid)  # N x img_wh^2 x num_indices x 2
         norm = tf.norm(diff, axis=3)  # N x img_wh^2 x num_indices
+        norm = tf.multiply(norm, part_mask_vals)
         exp = tf.exp(tf.negative(norm))  # N x img_wh^2 x num_indices
         scores = tf.reduce_max(exp, axis=2)  # N x img_wh^2
         seg = tf.reshape(scores, [-1, img_wh, img_wh])  # N x img_wh x img_wh
