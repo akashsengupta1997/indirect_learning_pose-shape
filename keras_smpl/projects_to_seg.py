@@ -17,6 +17,7 @@ def projects_to_seg(input):
     :return:
     """
     projects_with_depth, mask_vals = input
+    projects = projects_with_depth[:, :, :2]
 
     part_indices_path = "./keras_smpl/part_vertices.pkl"
     img_wh = 32
@@ -24,7 +25,6 @@ def projects_to_seg(input):
     with open(part_indices_path, 'rb') as f:
         part_indices = pickle.load(f)
 
-    projects = projects_with_depth[:, :, :2]
     i = tf.range(0, img_wh)
     j = tf.range(0, img_wh)
 

@@ -59,14 +59,13 @@ def compute_mask_map_over_batch(pixels_with_depth):
             vert_depths_at_pixel = verts_at_pixel[:, :, 2]  # n x 1
             # print('depths of verts at pixel', vert_depths_at_pixel.get_shape())
 
-            # TODO only do argmin if verts at pixel not empty
             is_empty = tf.equal(tf.size(vert_depths_at_pixel), tf.constant(0))
             # is_empty = K.print_tensor(is_empty, message='is_empty is')
 
             min_depth_vert_at_pixel = tf.cond(is_empty,
                                               lambda: tf.ones([1, 1, 4]),
                                               lambda: tf.gather(verts_at_pixel,
-                                                                tf.argmin(vert_depths_at_pixel,
+                                                                tf.argmax(vert_depths_at_pixel,
                                                                           axis=0)),
                                               )  # 1 x 1 x 4
             # Just returning ones if verts_at_pixel is empty is a pretty hacky way of getting
@@ -85,8 +84,8 @@ def compute_mask_map_over_batch(pixels_with_depth):
     print('stacked indices unique', stacked_min_indices.get_shape())
 
     mask = K.variable(np.ones((6890))*10)
-    sub = tf.scalar_mul(9, tf.ones_like(stacked_min_indices, dtype='float32'))
-    mask = tf.scatter_sub(mask, stacked_min_indices, sub)
+    ones = tf.ones_like(stacked_min_indices, dtype='float32')
+    mask = tf.scatter_update(mask, stacked_min_indices, ones)
     print('Mask', mask.get_shape())
 
     return mask
