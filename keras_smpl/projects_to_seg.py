@@ -20,7 +20,7 @@ def projects_to_seg(input):
     projects = projects_with_depth[:, :, :2]
 
     part_indices_path = "./keras_smpl/part_vertices.pkl"
-    img_wh = 32
+    img_wh = 96
 
     with open(part_indices_path, 'rb') as f:
         part_indices = pickle.load(f)
