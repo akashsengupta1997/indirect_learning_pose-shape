@@ -24,7 +24,10 @@ def compute_mask(batch_projects_with_depth):
     print('Batch pixels', batch_pixels.get_shape())
     print('Batch pixels with depth', batch_pixels_with_depth.get_shape())
 
-    masks = tf.map_fn(compute_mask_map_over_batch, batch_pixels_with_depth, dtype='float32')
+    masks = tf.map_fn(compute_mask_map_over_batch,
+                      batch_pixels_with_depth,
+                      dtype='float32',
+                      back_prop=False)
     print('Masks', masks.get_shape())
 
     return masks

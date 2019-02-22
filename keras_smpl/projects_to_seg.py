@@ -68,30 +68,5 @@ def projects_to_seg(input):
     output_segs = tf.reverse(output_segs, axis=[1])  # Flip image vertically
     return output_segs
 
-    # scores_hand = []
-    # scores_torso = []
-    # for i in range(img_wh):
-    #     for j in range(img_wh):
-    #         loc = tf.expand_dims(tf.constant([i, j], dtype='float32'), axis=0)
-    #
-    #         diff_hand = tf.subtract(loc, R_hand_projects)
-    #         norm_hand = tf.norm(diff_hand, axis=2)
-    #         exp_hand = tf.exp(tf.negative(norm_hand))
-    #         score_hand = tf.reduce_max(exp_hand, axis=1)
-    #         scores_hand.append(score_hand)
-    #
-    #         diff_torso = tf.subtract(loc, R_torso_projects)
-    #         norm_torso = tf.norm(diff_torso, axis=2)
-    #         exp_torso = tf.exp(tf.negative(norm_torso))
-    #         score_torso = tf.reduce_max(exp_torso, axis=1)
-    #         scores_torso.append(score_torso)
-    #
-    # R_hand_seg = tf.transpose(tf.reshape(tf.stack(scores_hand), [img_wh, img_wh, -1]))
-    # R_torso_seg = tf.transpose(tf.reshape(tf.stack(scores_torso), [img_wh, img_wh, -1]))
-    # print(R_hand_seg.shape)
-    # print(R_torso_seg.shape)
-    # return(K.eval(tf.stack([R_hand_seg, R_torso_seg], axis=3)))
-
-    # return(K.eval(seg))
 
 
