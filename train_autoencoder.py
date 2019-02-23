@@ -2,8 +2,6 @@ import numpy as np
 import os
 from matplotlib import pyplot as plt
 
-import tensorflow as tf
-from keras import backend as K
 from keras.models import Model
 from keras.layers import Input, Dense, Lambda, Reshape, Conv2D, MaxPooling2D, \
     BatchNormalization, Activation, Add, Concatenate
@@ -14,7 +12,8 @@ from keras.optimizers import Adam
 from keras_smpl.batch_smpl import SMPLLayer
 from keras_smpl.projection import persepective_project, orthographic_project2
 from keras_smpl.projects_to_seg import projects_to_seg
-from keras_smpl.load_mean_param import concat_mean_param
+from keras_smpl.concat_mean_param import concat_mean_param
+from keras_smpl.set_cam_params import load_mean_set_cam_params
 from keras_smpl.compute_mask import compute_mask
 
 from encoders.encoder_enet_simple import build_enet
@@ -40,34 +39,39 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         img_features = resnet.output
         img_features = Reshape((2048,))(img_features)
 
-    # --- IEF MODULE ---
-    # Instantiate ief layers
-    IEF_layer_1 = Dense(1024, activation='relu', name='IEF_layer_1')
-    IEF_layer_2 = Dense(1024, activation='relu', name='IEF_layer_2')
-    IEF_layer_3 = Dense(num_total_params, activation='linear', name='IEF_layer_3')
+    # # --- IEF MODULE ---
+    # # Instantiate ief layers
+    # IEF_layer_1 = Dense(1024, activation='relu', name='IEF_layer_1')
+    # IEF_layer_2 = Dense(1024, activation='relu', name='IEF_layer_2')
+    # IEF_layer_3 = Dense(num_total_params, activation='linear', name='IEF_layer_3')
+    #
+    # # Load mean params and set initial state to concatenation of image features and mean params
+    # state1, param1 = Lambda(concat_mean_param)(img_features)
+    #
+    # # Iteration 1
+    # delta1 = IEF_layer_1(state1)
+    # delta1 = IEF_layer_2(delta1)
+    # delta1 = IEF_layer_3(delta1)
+    # param2 = Add()([param1, delta1])
+    # state2 = Concatenate()([img_features, param2])
+    #
+    # # Iteration 2
+    # delta2 = IEF_layer_1(state2)
+    # delta2 = IEF_layer_2(delta2)
+    # delta2 = IEF_layer_3(delta2)
+    # param3 = Add()([param2, delta2])
+    # state3 = Concatenate()([img_features, param3])
+    #
+    # # Iteration 3
+    # delta3 = IEF_layer_1(state3)
+    # delta3 = IEF_layer_2(delta3)
+    # delta3 = IEF_layer_3(delta3)
+    # final_param = Add()([param3, delta3])
 
-    # Load mean params and set initial state to concatenation of image features and mean params
-    state1, param1 = Lambda(concat_mean_param)(img_features)
-
-    # Iteration 1
-    delta1 = IEF_layer_1(state1)
-    delta1 = IEF_layer_2(delta1)
-    delta1 = IEF_layer_3(delta1)
-    param2 = Add()([param1, delta1])
-    state2 = Concatenate()([img_features, param2])
-
-    # Iteration 2
-    delta2 = IEF_layer_1(state2)
-    delta2 = IEF_layer_2(delta2)
-    delta2 = IEF_layer_3(delta2)
-    param3 = Add()([param2, delta2])
-    state3 = Concatenate()([img_features, param3])
-
-    # Iteration 3
-    delta3 = IEF_layer_1(state3)
-    delta3 = IEF_layer_2(delta3)
-    delta3 = IEF_layer_3(delta3)
-    final_param = Add()([param3, delta3])
+    smpl = Dense(1024, activation='relu')(img_features)
+    smpl = Dense(1024, activation='relu')(smpl)
+    smpl = Dense(num_total_params, activation='linear')(smpl)
+    final_param = Lambda(load_mean_set_cam_params)(smpl)
 
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
     projects_with_depth = Lambda(orthographic_project2, name='project')([verts, final_param])

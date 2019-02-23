@@ -2,12 +2,10 @@ import numpy as np
 import os
 from matplotlib import pyplot as plt
 
-import tensorflow as tf
 from keras import backend as K
 from keras.models import Model
 from keras.layers import Input, Lambda, Reshape, Activation, Embedding
 from keras.preprocessing import image
-from keras.applications import resnet50
 from keras.optimizers import Adam
 
 from keras_smpl.batch_smpl import SMPLLayer
@@ -16,26 +14,12 @@ from keras_smpl.projection import persepective_project, orthographic_project, \
 from keras_smpl.projects_to_seg import projects_to_seg
 from keras_smpl.set_cam_params import set_cam_params, load_mean_set_cam_params
 from keras_smpl.compute_mask import compute_mask
-from keras_smpl.load_mean_param import load_mean_param, concat_mean_param
-from encoders.encoder_enet_simple import build_enet
 from renderer import SMPLRenderer
 
 from focal_loss import categorical_focal_loss
-#TODO depth ordering - each point projects to a pixel - find this pixel using ceil
-#TODO look at all points that project to certain pixel - create mask by looking at which points are visible
-
-# look at shapes in projects to seg - can multiply by a 6890 x 1 mask? (or 6890 x 2)
-# output (u,v,z) instead of just (u,v) from projection
-# compute mask function:
-# input: (u,v,z) - N x 6890 x 3
-# output: N x 6890 mask => 1 if vertex visible, 1000 if vertex invisible
-# what it will do:
-# find which pixel each vertex will project to using round
-# make img_wh x img_wh list which contains the z-values and indices of vertices projected to each pixel
-# for the min z value at each pixel, set mask for that index to 1, set mask for other indices to 1000
-
 
 # TODO input seg map as input to encoder - use simple  + IEF
+
 
 def classlab(labels, num_classes):
     """

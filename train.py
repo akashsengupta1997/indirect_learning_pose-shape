@@ -14,7 +14,7 @@ from keras.optimizers import Adam
 from keras_smpl.batch_smpl import SMPLLayer
 from keras_smpl.projection import persepective_project, orthographic_project2
 from keras_smpl.projects_to_seg import projects_to_seg
-from keras_smpl.load_mean_param import concat_mean_param
+from keras_smpl.concat_mean_param import concat_mean_param
 from keras_smpl.compute_mask import compute_mask
 
 from encoders.encoder_enet_simple import build_enet
@@ -25,6 +25,17 @@ from focal_loss import categorical_focal_loss
 
 def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes,
                 encoder_architecture='resnet50'):
+    """
+    Build indirect learning model, using backbone designated in encoder_architecture.
+    :param train_batch_size: batch size to use for training
+    :param input_shape: H x W x 3
+    :param smpl_path: path to SMPL model data
+    :param output_img_wh: width and height of output image
+    :param num_classes: number of part segmentation classes
+    :param encoder_architecture: backbone architecture
+    :return: 4 models - each takes images as inputs and outputs segmentations, smpl params,
+    vertex projections and renderings respectively.
+    """
     num_camera_params = 4
     num_smpl_params = 72 + 10
     num_total_params = num_smpl_params + num_camera_params
@@ -91,13 +102,6 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
     print('final param shape')
     print(final_param.get_shape())
 
-    # encoder = Dense(2048, activation='relu')(img_features)
-    # encoder = BatchNormalization()(encoder)
-    # encoder = Dense(1024, activation='relu')(encoder)
-    # encoder = BatchNormalization()(encoder)
-    # smpl = Dense(num_smpl_params, activation='tanh')(encoder)
-    # # smpl = Lambda(add_mean_params)(smpl)
-
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
     projects_with_depth = Lambda(orthographic_project2, name='project')([verts, final_param])
     masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
@@ -158,15 +162,24 @@ def classlab(labels, num_classes):
     return x
 
 
-def generate_data(image_generator, mask_generator, n, num_classes, dataset):
+def generate_data(image_generator, mask_generator, n, num_classes):
+    """
+    Generate 1 batch of training data (batch_size = n) from given keras generators (made using
+    flow_from_directory method).
+    Pre-processes mask generator output to go from H x W grayscale image to H x W x num_classes
+    labels.
+    :param image_generator: input image generator
+    :param mask_generator: output segmentation generator
+    :param n: batch size
+    :param num_classes: numberof segmentation classes
+    :return: np arrays of 1 batch of input images and 1 batch of output labels.
+    """
     images = []
     labels = []
     i = 0
     while i < n:
         x = image_generator.next()
         y = mask_generator.next()
-        # if dataset == 'ppp':  # Need to change labels if using ppp dataset
-        #     y = labels_from_seg_image(y)
         j = 0
         while j < x.shape[0]:
             images.append(x[j, :, :, :])
