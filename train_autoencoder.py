@@ -193,7 +193,8 @@ def train(img_wh, output_img_wh, dataset):
                           output_img_wh,
                           num_classes)
 
-    segs_model.compile(optimizer="adam",
+    adam_optimiser = Adam(lr=0.0001)
+    segs_model.compile(optimizer=adam_optimiser,
                                  loss=categorical_focal_loss(gamma=5.0),
                                  metrics=['accuracy'])
 
