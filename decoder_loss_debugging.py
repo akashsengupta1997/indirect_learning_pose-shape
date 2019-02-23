@@ -117,8 +117,8 @@ def train(output_wh, num_classes, num_indices):
                                                                             output_wh,
                                                                             num_classes)
 
-    segs_model.compile(optimizer="adam", loss='categorical_crossentropy', metrics=['accuracy'])
-    # segs_model.compile(optimizer="adam", loss=categorical_focal_loss(gamma=2.0), metrics=['accuracy'])
+    # segs_model.compile(optimizer="adam", loss='categorical_crossentropy', metrics=['accuracy'])
+    segs_model.compile(optimizer="adam", loss=categorical_focal_loss(gamma=5.0), metrics=['accuracy'])
 
     for trial in range(1601):
         print "Epoch", trial

@@ -20,6 +20,8 @@ from keras_smpl.compute_mask import compute_mask
 from encoders.encoder_enet_simple import build_enet
 from renderer import SMPLRenderer
 
+from focal_loss import categorical_focal_loss
+
 
 def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes,
                 encoder_architecture='resnet50'):
@@ -280,10 +282,14 @@ def train(img_wh, output_img_wh, dataset):
                                        "./neutral_smpl_with_cocoplus_reg.pkl",
                                        output_img_wh,
                                        num_classes)
-    adam_optimiser = Adam(lr=0.0005)
-    indirect_learn_model.compile(loss='categorical_crossentropy',
-                                 optimizer=adam_optimiser,
+    # adam_optimiser = Adam(lr=0.0005)
+    # indirect_learn_model.compile(loss='categorical_crossentropy',
+    #                              optimizer=adam_optimiser,
+    #                              metrics=['accuracy'])
+    indirect_learn_model.compile(optimizer="adam",
+                                 loss=categorical_focal_loss(gamma=5.0),
                                  metrics=['accuracy'])
+
 
     print("Model compiled.")
 
