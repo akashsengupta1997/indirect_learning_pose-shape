@@ -34,13 +34,17 @@ def concat_mean_param(img_features):
     mean_pose[:3] = 0.
     mean_shape = mean_vals['shape']
 
-    # This initializes the global pose to be up-right when projected
-    # mean_pose[0] = np.pi
+    # Set initial smpl parameters
+    mean = np.zeros((1, 86))
+    mean[0, 4:] = np.expand_dims(np.hstack((mean_pose, mean_shape)), axis=0)
 
-    mean = np.expand_dims(np.hstack((mean_pose, mean_shape)), axis=0)
-    # mean = np.zeros((1, 82))
+    # Set initial camera parameters - dependent on output image size!
+    mean[0, 0] = 48.0
+    mean[0, 1] = 48.0
+    mean[0, 2] = 48.0
+    mean[0, 3] = 60.0
+
     mean = tf.constant(mean, dtype='float32')
-    # print(mean.shape)
     mean = tf.tile(mean, [K.shape(img_features)[0], 1])
 
     state = tf.concat([img_features, mean], axis=1)

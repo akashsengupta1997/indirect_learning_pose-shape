@@ -12,18 +12,20 @@ from keras.applications import resnet50
 from keras.optimizers import Adam
 
 from keras_smpl.batch_smpl import SMPLLayer
-from keras_smpl.projection import persepective_project, orthographic_project
+from keras_smpl.projection import persepective_project, orthographic_project2
 from keras_smpl.projects_to_seg import projects_to_seg
-from keras_smpl.set_cam_params import set_cam_params
-from keras_smpl.load_mean_param import load_mean_param, concat_mean_param
+from keras_smpl.load_mean_param import concat_mean_param
+from keras_smpl.compute_mask import compute_mask
+
 from encoders.encoder_enet_simple import build_enet
 from renderer import SMPLRenderer
 
 
 def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes,
                 encoder_architecture='resnet50'):
-    # num_camera_params = 5
+    num_camera_params = 4
     num_smpl_params = 72 + 10
+    num_total_params = num_smpl_params + num_camera_params
 
     # --- BACKBONE ---
     if encoder_architecture == 'enet':
@@ -46,7 +48,7 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
     # Instantiate ief layers
     IEF_layer_1 = Dense(1024, activation='relu', name='IEF_layer_1')
     IEF_layer_2 = Dense(1024, activation='relu', name='IEF_layer_2')
-    IEF_layer_3 = Dense(num_smpl_params, activation='linear', name='IEF_layer_3')
+    IEF_layer_3 = Dense(num_total_params, activation='linear', name='IEF_layer_3')
 
     # Load mean params and set initial state to concatenation of image features and mean params
     state1, param1 = Lambda(concat_mean_param)(img_features)
@@ -95,28 +97,25 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
     # # smpl = Lambda(add_mean_params)(smpl)
 
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
-    # projects = Lambda(persepective_project, name='projection')([verts, smpl])
-    projects = Lambda(orthographic_project, name='projection')(verts)
-    segs = Lambda(projects_to_seg, name='segmentation')(projects)
+    projects_with_depth = Lambda(orthographic_project2, name='project')([verts, final_param])
+    masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
+    segs = Lambda(projects_to_seg, name='segment')([projects_with_depth, masks])
     segs = Reshape((output_img_wh * output_img_wh, num_classes))(segs)
     segs = Activation('softmax')(segs)
 
     segs_model = Model(inputs=inp, outputs=segs)
     smpl_model = Model(inputs=inp, outputs=final_param)
     verts_model = Model(inputs=inp, outputs=verts)
-    projects_model = Model(inputs=inp, outputs=projects)
+    projects_model = Model(inputs=inp, outputs=projects_with_depth)
 
     print(segs_model.summary())
     print(verts.get_shape())
-    print(projects.get_shape())
+    print(projects_with_depth.get_shape())
     print(segs.get_shape())
 
     return segs_model, smpl_model, verts_model, projects_model
 
-# TODO embedding layer that gives smpl parameters for input image id
-# TODO decoder takes in smpl parameters and outputs body part segmentation
-# TODO embedding layer learns to give smpl outputs
-# TODO do this to debug decoder and loss
+
 def convert_to_seg_predict(model, smpl_path):
     """
     Converts training indirect learning model to test model that outputs part segmentation.
@@ -366,4 +365,4 @@ def train(img_wh, output_img_wh, dataset):
 
     print("Finished")
 
-train(256, 64, 'up-s31')
+train(256, 96, 'up-s31')
