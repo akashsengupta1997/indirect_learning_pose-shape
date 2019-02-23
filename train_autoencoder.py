@@ -102,24 +102,26 @@ def classlab(labels, num_classes):
     return x
 
 
-def generate_data(mask_generator, n, num_classes):
-    images = []
-    labels = []
+def generate_data(input_mask_generator, output_mask_generator, n, num_classes):
+    input_labels = []
+    output_labels = []
     i = 0
     while i < n:
-        y = mask_generator.next()
+        x = input_mask_generator.next()
+        y = output_mask_generator.next()
         j = 0
         while j < y.shape[0]:
-            labels.append(classlab(y[j, :, :, :].astype(np.uint8), num_classes))
+            input_labels.append(classlab(x[j, :, :, :].astype(np.uint8), num_classes))
+            output_labels.append(classlab(y[j, :, :, :].astype(np.uint8), num_classes))
             j = j + 1
             i = i + 1
             if i >= n:
                 break
 
-    return np.array(labels)
+    return np.array(input_labels), np.array(output_labels)
 
 
-def train(img_wh, dataset):
+def train(img_wh, output_img_wh, dataset):
     batch_size = 1  # TODO change back to 10
 
     if dataset == 'up-s31':
@@ -149,20 +151,28 @@ def train(img_wh, dataset):
     # val_image_datagen = ImageDataGenerator(**val_image_data_gen_args)
     # val_mask_datagen = ImageDataGenerator(**val_mask_data_gen_args)
 
-    train_mask_generator = train_mask_datagen.flow_from_directory(
+    input_mask_generator = train_mask_datagen.flow_from_directory(
         train_dir,
         batch_size=batch_size,
         target_size=(img_wh, img_wh),
         class_mode=None,
         color_mode="grayscale")
 
+    output_mask_generator = train_mask_datagen.flow_from_directory(
+        train_dir,
+        batch_size=batch_size,
+        target_size=(output_img_wh, output_img_wh),
+        class_mode=None,
+        color_mode="grayscale")
+
     print('Generators loaded.')
 
     # For testing data loading
-    y = train_mask_generator.next()
-    print('y shape out of training generator', y.shape)  # should = (batch_size, dec_hw, dec_hw, 1)
+    x = input_mask_generator.next()
+    y = output_mask_generator.next()
     plt.figure(1)
     plt.subplot(221)
+    plt.imshow(x[0, :, :, 0])
     plt.subplot(222)
     plt.imshow(y[0, :, :, 0])
     y_post = classlab(y[0], num_classes)
@@ -176,7 +186,7 @@ def train(img_wh, dataset):
         build_autoencoder(1,
                           (img_wh, img_wh, num_classes),
                           "./neutral_smpl_with_cocoplus_reg.pkl",
-                          img_wh,
+                          output_img_wh,
                           num_classes)
 
     segs_model.compile(optimizer="adam",
@@ -191,12 +201,14 @@ def train(img_wh, dataset):
 
         def train_data_gen():
             while True:
-                train_labels = generate_data(train_mask_generator,
-                                                         batch_size,
-                                                         num_classes)
-                reshaped_train_labels = np.reshape(train_labels,
-                                                   (batch_size, img_wh * img_wh, num_classes))
-                yield (train_labels, reshaped_train_labels)
+                train_input_labels, train_output_labels = generate_data(input_mask_generator,
+                                                                        output_mask_generator,
+                                                                        batch_size,
+                                                                        num_classes)
+                reshaped_output_labels = np.reshape(train_output_labels,
+                                                   (batch_size, output_img_wh * output_img_wh,
+                                                    num_classes))
+                yield (train_input_labels, reshaped_output_labels)
 
         history = segs_model.fit_generator(train_data_gen(),
                                            steps_per_epoch=1,
@@ -204,19 +216,21 @@ def train(img_wh, dataset):
                                            verbose=1)
 
         # TODO remove this testing code
-        test_data = generate_data(train_mask_generator,
-                                  1,
-                                  num_classes)
+        test_input_labels, test_output_labels = generate_data(input_mask_generator,
+                                                              output_mask_generator,
+                                                              1,
+                                                              num_classes)
 
-        print(smpl_test_model.predict(test_data))
+        print(smpl_test_model.predict(test_input_labels))
+
         if trials % 10 == 0:
-            test_verts = verts_test_model.predict(test_data)
-            test_projects = projects_test_model.predict(test_data)
-            test_seg = np.reshape(segs_model.predict(test_data),
-                                  (1, img_wh, img_wh, num_classes))
+            test_verts = verts_test_model.predict(test_input_labels)
+            test_projects = projects_test_model.predict(test_input_labels)
+            test_seg = np.reshape(segs_model.predict(test_input_labels),
+                                  (1, output_img_wh, output_img_wh, num_classes))
             test_seg_map = np.argmax(test_seg[0], axis=-1)
-            test_gt_seg_map = np.argmax(np.reshape(test_data[0],
-                                                   (img_wh, img_wh,
+            test_gt_seg_map = np.argmax(np.reshape(test_output_labels[0],
+                                                   (output_img_wh, output_img_wh,
                                                     num_classes)), axis=-1)
             renderer = SMPLRenderer()
             rend_img_keras_model = renderer(verts=test_verts[0], render_seg=False)
@@ -249,4 +263,4 @@ def train(img_wh, dataset):
     print("Finished")
 
 
-train(256, 'up-s31')
+train(256, 96, 'up-s31')
