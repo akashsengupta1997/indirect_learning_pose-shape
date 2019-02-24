@@ -74,39 +74,39 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         img_features = Reshape((2048,))(block6)
 
 
-    # # --- IEF MODULE ---
-    # # Instantiate ief layers
-    # IEF_layer_1 = Dense(1024, activation='relu', name='IEF_layer_1')
-    # IEF_layer_2 = Dense(1024, activation='relu', name='IEF_layer_2')
-    # IEF_layer_3 = Dense(num_total_params, activation='linear', name='IEF_layer_3')
-    #
-    # # Load mean params and set initial state to concatenation of image features and mean params
-    # state1, param1 = Lambda(concat_mean_param)(img_features)
-    #
-    # # Iteration 1
-    # delta1 = IEF_layer_1(state1)
-    # delta1 = IEF_layer_2(delta1)
-    # delta1 = IEF_layer_3(delta1)
-    # param2 = Add()([param1, delta1])
-    # state2 = Concatenate()([img_features, param2])
-    #
-    # # Iteration 2
-    # delta2 = IEF_layer_1(state2)
-    # delta2 = IEF_layer_2(delta2)
-    # delta2 = IEF_layer_3(delta2)
-    # param3 = Add()([param2, delta2])
-    # state3 = Concatenate()([img_features, param3])
-    #
-    # # Iteration 3
-    # delta3 = IEF_layer_1(state3)
-    # delta3 = IEF_layer_2(delta3)
-    # delta3 = IEF_layer_3(delta3)
-    # final_param = Add()([param3, delta3])
+    # --- IEF MODULE ---
+    # Instantiate ief layers
+    IEF_layer_1 = Dense(1024, activation='relu', name='IEF_layer_1')
+    IEF_layer_2 = Dense(1024, activation='relu', name='IEF_layer_2')
+    IEF_layer_3 = Dense(num_total_params, activation='linear', name='IEF_layer_3')
 
-    smpl = Dense(2048, activation='relu')(img_features)
-    smpl = Dense(1024, activation='relu')(smpl)
-    smpl = Dense(num_total_params, activation='linear')(smpl)
-    final_param = Lambda(load_mean_set_cam_params)(smpl)
+    # Load mean params and set initial state to concatenation of image features and mean params
+    state1, param1 = Lambda(concat_mean_param)(img_features)
+
+    # Iteration 1
+    delta1 = IEF_layer_1(state1)
+    delta1 = IEF_layer_2(delta1)
+    delta1 = IEF_layer_3(delta1)
+    param2 = Add()([param1, delta1])
+    state2 = Concatenate()([img_features, param2])
+
+    # Iteration 2
+    delta2 = IEF_layer_1(state2)
+    delta2 = IEF_layer_2(delta2)
+    delta2 = IEF_layer_3(delta2)
+    param3 = Add()([param2, delta2])
+    state3 = Concatenate()([img_features, param3])
+
+    # Iteration 3
+    delta3 = IEF_layer_1(state3)
+    delta3 = IEF_layer_2(delta3)
+    delta3 = IEF_layer_3(delta3)
+    final_param = Add()([param3, delta3])
+
+    # smpl = Dense(2048, activation='relu')(img_features)
+    # smpl = Dense(1024, activation='relu')(smpl)
+    # smpl = Dense(num_total_params, activation='linear')(smpl)
+    # final_param = Lambda(load_mean_set_cam_params)(smpl)
 
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
     projects_with_depth = Lambda(orthographic_project2, name='project')([verts, final_param])
@@ -263,7 +263,7 @@ def train(img_wh, output_img_wh, dataset):
 
         print(smpl_test_model.predict(test_input_labels))
 
-        if trials % 10 == 0:
+        if trials % 50 == 0:
             test_verts = verts_test_model.predict(test_input_labels)
             test_projects = projects_test_model.predict(test_input_labels)
             test_seg = np.reshape(segs_model.predict(test_input_labels),
