@@ -106,6 +106,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
     smpl = Dense(2048, activation='relu')(img_features)
     smpl = Dense(1024, activation='relu')(smpl)
     smpl = Dense(num_total_params, activation='linear')(smpl)
+    smpl = Lambda(lambda x: x * 0.1)(smpl)
     final_param = Lambda(load_mean_set_cam_params)(smpl)
 
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
