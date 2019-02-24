@@ -23,7 +23,7 @@ from focal_loss import categorical_focal_loss
 
 
 def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes,
-                      encoder_architecture='resnet50'):
+                      encoder_architecture='simple'):
     num_camera_params = 4
     num_smpl_params = 72 + 10
     num_total_params = num_smpl_params + num_camera_params
@@ -38,6 +38,41 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         inp = resnet.input
         img_features = resnet.output
         img_features = Reshape((2048,))(img_features)
+
+    elif encoder_architecture == 'simple':
+        inp = Input(shape=input_shape)  # using 64 x 64 x 32 input with simple encoder for now
+
+        block1 = Conv2D(256, 3, padding='same')(inp)
+        block1 = BatchNormalization()(block1)
+        block1 = Activation('relu')(block1)
+        block1 = MaxPooling2D()(block1)
+
+        block2 = Conv2D(256, 3, padding='same')(block1)
+        block2 = BatchNormalization()(block2)
+        block2 = Activation('relu')(block2)
+        block2 = MaxPooling2D()(block2)
+
+        block3 = Conv2D(512, 3, padding='same')(block2)
+        block3 = BatchNormalization()(block3)
+        block3 = Activation('relu')(block3)
+        block3 = MaxPooling2D()(block3)
+
+        block4 = Conv2D(512, 3, padding='same')(block3)
+        block4 = BatchNormalization()(block4)
+        block4 = Activation('relu')(block4)
+        block4 = MaxPooling2D()(block4)
+
+        block5 = Conv2D(1024, 3, padding='same')(block4)
+        block5 = BatchNormalization()(block5)
+        block5 = Activation('relu')(block5)
+        block5 = MaxPooling2D()(block5)
+
+        block6 = Conv2D(2048, 3, padding='same')(block5)
+        block6 = BatchNormalization()(block6)
+        block6 = Activation('relu')(block6)
+        block6 = MaxPooling2D()(block6)
+        img_features = Reshape((2048,))(block6)
+
 
     # # --- IEF MODULE ---
     # # Instantiate ief layers
@@ -68,7 +103,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
     # delta3 = IEF_layer_3(delta3)
     # final_param = Add()([param3, delta3])
 
-    smpl = Dense(1024, activation='relu')(img_features)
+    smpl = Dense(2048, activation='relu')(img_features)
     smpl = Dense(1024, activation='relu')(smpl)
     smpl = Dense(num_total_params, activation='linear')(smpl)
     final_param = Lambda(load_mean_set_cam_params)(smpl)
@@ -268,4 +303,4 @@ def train(img_wh, output_img_wh, dataset):
     print("Finished")
 
 
-train(256, 96, 'up-s31')
+train(64, 64, 'up-s31')
