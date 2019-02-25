@@ -25,7 +25,7 @@ from focal_loss import categorical_focal_loss
 
 
 def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes,
-                encoder_architecture='resnet50', use_IEF = False):
+                encoder_architecture='resnet50', use_IEF=False):
     """
     Build indirect learning model, using backbone designated in encoder_architecture.
     :param train_batch_size: batch size to use for training

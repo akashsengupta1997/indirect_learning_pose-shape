@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import cv2
 from matplotlib import pyplot as plt
 
 from keras.models import Model
@@ -87,7 +88,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         delta1 = IEF_layer_1(state1)
         delta1 = IEF_layer_2(delta1)
         delta1 = IEF_layer_3(delta1)
-        delta1 = Lambda(lambda x: x * 0.1)(delta1)
+        delta1 = Lambda(lambda x: x * 0.05)(delta1)
         param2 = Add()([param1, delta1])
         state2 = Concatenate()([img_features, param2])
 
@@ -95,7 +96,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         delta2 = IEF_layer_1(state2)
         delta2 = IEF_layer_2(delta2)
         delta2 = IEF_layer_3(delta2)
-        delta2 = Lambda(lambda x: x * 0.1)(delta2)
+        delta2 = Lambda(lambda x: x * 0.05)(delta2)
         param3 = Add()([param2, delta2])
         state3 = Concatenate()([img_features, param3])
 
@@ -103,7 +104,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         delta3 = IEF_layer_1(state3)
         delta3 = IEF_layer_2(delta3)
         delta3 = IEF_layer_3(delta3)
-        delta3 = Lambda(lambda x: x * 0.1)(delta3)
+        delta3 = Lambda(lambda x: x * 0.05)(delta3)
         final_param = Add()([param3, delta3])
 
     else:
@@ -165,18 +166,20 @@ def generate_data(input_mask_generator, output_mask_generator, n, num_classes):
     return np.array(input_labels), np.array(output_labels)
 
 
-def train(img_wh, output_img_wh, dataset):
-    batch_size = 1  # TODO change back to 10
+def train(input_wh, output_wh, dataset):
+    batch_size = 4  # TODO change back to 10
 
     if dataset == 'up-s31':
-        train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
-        val_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
+        # train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
+        train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded/masks"
+        # val_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
+        monitor_dir = "./monitor_train/monitor_train_images"
         # TODO create validation directory
         num_classes = 32
-        num_train_images = 8515
+        num_train_images = 6813
 
     assert os.path.isdir(train_dir), 'Invalid train directory'
-    assert os.path.isdir(val_dir), 'Invalid validation directory'
+    # assert os.path.isdir(val_dir), 'Invalid validation directory'
 
     train_mask_data_gen_args = dict(
         rotation_range=40,
@@ -195,54 +198,56 @@ def train(img_wh, output_img_wh, dataset):
     # val_image_datagen = ImageDataGenerator(**val_image_data_gen_args)
     # val_mask_datagen = ImageDataGenerator(**val_mask_data_gen_args)
 
+    seed = 1
     input_mask_generator = train_mask_datagen.flow_from_directory(
         train_dir,
         batch_size=batch_size,
-        target_size=(img_wh, img_wh),
+        target_size=(input_wh, input_wh),
         class_mode=None,
-        color_mode="grayscale")
+        color_mode="grayscale",
+        seed=seed)
 
     output_mask_generator = train_mask_datagen.flow_from_directory(
         train_dir,
         batch_size=batch_size,
-        target_size=(output_img_wh, output_img_wh),
+        target_size=(output_wh, output_wh),
         class_mode=None,
-        color_mode="grayscale")
+        color_mode="grayscale",
+        seed=seed)
 
     print('Generators loaded.')
 
-    # For testing data loading
-    x = input_mask_generator.next()
-    y = output_mask_generator.next()
-    plt.figure(1)
-    plt.subplot(221)
-    plt.imshow(x[0, :, :, 0])
-    plt.subplot(222)
-    plt.imshow(y[0, :, :, 0])
-    y_post = classlab(y[0], num_classes)
-    plt.subplot(223)
-    plt.imshow(y_post[:, :, 0])
-    plt.subplot(224)
-    plt.imshow(y_post[:, :, 13])
-    plt.show()
+    # # For testing data loading
+    # x = input_mask_generator.next()
+    # y = output_mask_generator.next()
+    # plt.figure(1)
+    # plt.subplot(221)
+    # plt.imshow(x[0, :, :, 0])
+    # plt.subplot(222)
+    # plt.imshow(y[0, :, :, 0])
+    # y_post = classlab(y[0], num_classes)
+    # plt.subplot(223)
+    # plt.imshow(y_post[:, :, 0])
+    # plt.subplot(224)
+    # plt.imshow(y_post[:, :, 13])
+    # plt.show()
 
-    segs_model, smpl_test_model, verts_test_model, projects_test_model = \
-        build_autoencoder(1,
-                          (img_wh, img_wh, num_classes),
-                          "./neutral_smpl_with_cocoplus_reg.pkl",
-                          output_img_wh,
-                          num_classes)
+    segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
+        batch_size,
+        (input_wh, input_wh, num_classes),
+        "./neutral_smpl_with_cocoplus_reg.pkl",
+        output_wh,
+        num_classes)
 
     adam_optimiser = Adam(lr=0.0001)
     segs_model.compile(optimizer=adam_optimiser,
-                                 loss=categorical_focal_loss(gamma=5.0),
-                                 metrics=['accuracy'])
+                       loss=categorical_focal_loss(gamma=5.0),
+                       metrics=['accuracy'])
 
     print("Model compiled.")
 
-    for trials in range(4000):
-        nb_epoch = 1
-        print("Fitting", trials)
+    for trial in range(4000):
+        print("Fitting", trial)
 
         def train_data_gen():
             while True:
@@ -251,58 +256,106 @@ def train(img_wh, output_img_wh, dataset):
                                                                         batch_size,
                                                                         num_classes)
                 reshaped_output_labels = np.reshape(train_output_labels,
-                                                   (batch_size, output_img_wh * output_img_wh,
+                                                   (batch_size, output_wh * output_wh,
                                                     num_classes))
                 yield (train_input_labels, reshaped_output_labels)
 
-        history = segs_model.fit_generator(train_data_gen(),
-                                           steps_per_epoch=1,
-                                           nb_epoch=nb_epoch,
-                                           verbose=1)
+        # history = segs_model.fit_generator(train_data_gen(),
+        #                                    steps_per_epoch=1,
+        #                                    nb_epoch=1,
+        #                                    verbose=1)
 
-        if trials % 20 == 0:
-            # TODO remove this testing code
-            test_input_labels, test_output_labels = generate_data(input_mask_generator,
-                                                                  output_mask_generator,
-                                                                  1,
-                                                                  num_classes)
+        renderer = SMPLRenderer()
+        if trial % 20 == 0:
 
-            print(smpl_test_model.predict(test_input_labels))
-            test_verts = verts_test_model.predict(test_input_labels)
-            test_projects = projects_test_model.predict(test_input_labels)
-            test_seg = np.reshape(segs_model.predict(test_input_labels),
-                                  (1, output_img_wh, output_img_wh, num_classes))
-            test_seg_map = np.argmax(test_seg[0], axis=-1)
-            test_gt_seg_map = np.argmax(np.reshape(test_output_labels[0],
-                                                   (output_img_wh, output_img_wh,
-                                                    num_classes)), axis=-1)
-            renderer = SMPLRenderer()
-            rend_img_keras_model = renderer(verts=test_verts[0], render_seg=False)
-            plt.figure(1)
-            plt.clf()
-            plt.imshow(rend_img_keras_model)
-            plt.savefig("./test_outputs/rend_" + str(trials) + ".png")
-            plt.figure(2)
-            plt.clf()
-            plt.scatter(test_projects[0, :, 0], test_projects[0, :, 1], s=1)
-            plt.gca().set_aspect('equal', adjustable='box')
-            plt.savefig("./test_outputs/verts_" + str(trials) + ".png")
-            plt.figure(3)
-            plt.clf()
-            plt.imshow(test_seg_map)
-            plt.savefig("./test_outputs/seg_" + str(trials) + ".png")
+            inputs_masks = []
+            gt_seg_maps = []
+            for fname in sorted(os.listdir(monitor_dir)):
+                if fname.endswith(".png"):
+                    input_labels = cv2.imread(os.path.join(monitor_dir, fname), 0)
+                    input_labels = cv2.resize(input_labels, (input_wh, input_wh),
+                                              interpolation=cv2.INTER_NEAREST)
+                    input_mask = classlab(input_labels, num_classes)
+                    gt_seg_maps.append(input_labels)
+                    inputs_masks.append(input_mask)
 
-            if trials == 0:
-                plt.figure(5)
+            gt_seg_maps = np.array(gt_seg_maps)
+            input_mask_array = np.array(inputs_masks)
+            input_mask_array = input_mask_array[:batch_size, :, :, :]
+
+            smpls = smpl_model.predict(input_mask_array)
+            verts = verts_model.predict(input_mask_array)
+            projects = projects_model.predict(input_mask_array)
+            segs = np.reshape(segs_model.predict(input_mask_array),
+                              [-1, output_wh, output_wh, num_classes])
+            seg_maps = np.argmax(segs, axis=-1)
+
+            print(smpls[0])
+            i = 0
+            while i < batch_size:
+                plt.figure(1)
                 plt.clf()
-                plt.imshow(test_gt_seg_map)
-                plt.savefig("./test_outputs/gt_seg.png")
+                plt.imshow(seg_maps[i])
+                plt.savefig("./monitor_train/seg_" + str(trial) + "_" + str(i) + ".png")
+                plt.figure(2)
+                plt.clf()
+                plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
+                plt.gca().set_aspect('equal', adjustable='box')
+                plt.savefig("./monitor_train/verts_" + str(trial) + "_" + str(i) + ".png")
+                plt.figure(3)
+                rend_img = renderer(verts=verts[i], render_seg=False)
+                plt.imshow(rend_img)
+                plt.savefig("./monitor_train/rend_" + str(trial) + "_" + str(i) + ".png")
 
-            # plt.show()
+                if trial == 0:
+                    plt.figure(4)
+                    plt.clf()
+                    plt.imshow(gt_seg_maps[i])
+                    plt.savefig("./monitor_train/gt_seg_" + str(i) + ".png")
 
-        # if trials % 100 == 0:
+                i += 1
+
+            # TODO remove this testing code
+            # test_input_labels, test_output_labels = generate_data(input_mask_generator,
+            #                                                       output_mask_generator,
+            #                                                       1,
+            #                                                       num_classes)
+            #
+            # print(smpl_model.predict(test_input_labels))
+            # test_verts = verts_model.predict(test_input_labels)
+            # test_projects = projects_model.predict(test_input_labels)
+            # test_seg = np.reshape(segs_model.predict(test_input_labels),
+            #                       (1, output_img_wh, output_img_wh, num_classes))
+            # test_seg_map = np.argmax(test_seg[0], axis=-1)
+            # test_gt_seg_map = np.argmax(np.reshape(test_output_labels[0],
+            #                                        (output_img_wh, output_img_wh,
+            #                                         num_classes)), axis=-1)
+            # renderer = SMPLRenderer()
+            # rend_img_keras_model = renderer(verts=test_verts[0], render_seg=False)
+            # plt.figure(1)
+            # plt.clf()
+            # plt.imshow(rend_img_keras_model)
+            # plt.savefig("./test_outputs/rend_" + str(trial) + ".png")
+            # plt.figure(2)
+            # plt.clf()
+            # plt.scatter(test_projects[0, :, 0], test_projects[0, :, 1], s=1)
+            # plt.gca().set_aspect('equal', adjustable='box')
+            # plt.savefig("./test_outputs/verts_" + str(trial) + ".png")
+            # plt.figure(3)
+            # plt.clf()
+            # plt.imshow(test_seg_map)
+            # plt.savefig("./test_outputs/seg_" + str(trial) + ".png")
+            #
+            # if trial == 0:
+            #     plt.figure(5)
+            #     plt.clf()
+            #     plt.imshow(test_gt_seg_map)
+            #     plt.savefig("./test_outputs/gt_seg.png")
+
+
+        # if trial % 100 == 0:
         #     segs_model.save('test_models/ups31_'
-        #                      + str(nb_epoch * (trials + 1)).zfill(4) + '.hdf5')
+        #                      + str(nb_epoch * (trial + 1)).zfill(4) + '.hdf5')
 
     print("Finished")
 
