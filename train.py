@@ -15,6 +15,7 @@ from keras_smpl.batch_smpl import SMPLLayer
 from keras_smpl.projection import persepective_project, orthographic_project2
 from keras_smpl.projects_to_seg import projects_to_seg
 from keras_smpl.concat_mean_param import concat_mean_param
+from keras_smpl.set_cam_params import load_mean_set_cam_params
 from keras_smpl.compute_mask import compute_mask
 
 from encoders.encoder_enet_simple import build_enet
@@ -24,7 +25,7 @@ from focal_loss import categorical_focal_loss
 
 
 def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes,
-                encoder_architecture='resnet50'):
+                encoder_architecture='resnet50', use_IEF = False):
     """
     Build indirect learning model, using backbone designated in encoder_architecture.
     :param train_batch_size: batch size to use for training
@@ -49,58 +50,44 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
         resnet = resnet50.ResNet50(include_top=False, weights=None, input_shape=input_shape)
         inp = resnet.input
         img_features = resnet.output
-
-        print('resnet shape')
-        print(img_features.get_shape())
-        # img_features = Flatten()(img_features)
         img_features = Reshape((2048,))(img_features)
-        print('post reshape shape')
-        print(img_features.get_shape())
 
-    # --- IEF MODULE ---
-    # Instantiate ief layers
-    IEF_layer_1 = Dense(1024, activation='relu', name='IEF_layer_1')
-    IEF_layer_2 = Dense(1024, activation='relu', name='IEF_layer_2')
-    IEF_layer_3 = Dense(num_total_params, activation='linear', name='IEF_layer_3')
+    if use_IEF:
+        # --- IEF MODULE ---
+        # Instantiate ief layers
+        IEF_layer_1 = Dense(1024, activation='relu', name='IEF_layer_1')
+        IEF_layer_2 = Dense(1024, activation='relu', name='IEF_layer_2')
+        IEF_layer_3 = Dense(num_total_params, activation='linear', name='IEF_layer_3')
 
-    # Load mean params and set initial state to concatenation of image features and mean params
-    state1, param1 = Lambda(concat_mean_param)(img_features)
-    print('sanity check (same as above')
-    print(img_features.get_shape())
-    print('mean params shape')
-    print(param1.get_shape())
-    print('state1 shape')
-    print(state1.get_shape())
+        # Load mean params and set initial state to concatenation of image features and mean params
+        state1, param1 = Lambda(concat_mean_param)(img_features)
 
-    # Iteration 1
-    delta1 = IEF_layer_1(state1)
-    delta1 = IEF_layer_2(delta1)
-    delta1 = IEF_layer_3(delta1)
-    param2 = Add()([param1, delta1])
-    state2 = Concatenate()([img_features, param2])
-    print('param2 shape')
-    print(param2.get_shape())
-    print('state2 shape')
-    print(state2.get_shape())
+        # Iteration 1
+        delta1 = IEF_layer_1(state1)
+        delta1 = IEF_layer_2(delta1)
+        delta1 = IEF_layer_3(delta1)
+        param2 = Add()([param1, delta1])
+        state2 = Concatenate()([img_features, param2])
 
-    # Iteration 2
-    delta2 = IEF_layer_1(state2)
-    delta2 = IEF_layer_2(delta2)
-    delta2 = IEF_layer_3(delta2)
-    param3 = Add()([param2, delta2])
-    state3 = Concatenate()([img_features, param3])
-    print('param3 shape')
-    print(param3.get_shape())
-    print('state3 shape')
-    print(state3.get_shape())
+        # Iteration 2
+        delta2 = IEF_layer_1(state2)
+        delta2 = IEF_layer_2(delta2)
+        delta2 = IEF_layer_3(delta2)
+        param3 = Add()([param2, delta2])
+        state3 = Concatenate()([img_features, param3])
 
-    # Iteration 3
-    delta3 = IEF_layer_1(state3)
-    delta3 = IEF_layer_2(delta3)
-    delta3 = IEF_layer_3(delta3)
-    final_param = Add()([param3, delta3])
-    print('final param shape')
-    print(final_param.get_shape())
+        # Iteration 3
+        delta3 = IEF_layer_1(state3)
+        delta3 = IEF_layer_2(delta3)
+        delta3 = IEF_layer_3(delta3)
+        final_param = Add()([param3, delta3])
+
+    else:
+        smpl = Dense(2048, activation='relu')(img_features)
+        smpl = Dense(1024, activation='relu')(smpl)
+        smpl = Dense(num_total_params, activation='linear')(smpl)
+        smpl = Lambda(lambda x: x * 0.1, name="scale_down")(smpl)
+        final_param = Lambda(load_mean_set_cam_params)(smpl)
 
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
     projects_with_depth = Lambda(orthographic_project2, name='project')([verts, final_param])
@@ -115,35 +102,8 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
     projects_model = Model(inputs=inp, outputs=projects_with_depth)
 
     print(segs_model.summary())
-    print(verts.get_shape())
-    print(projects_with_depth.get_shape())
-    print(segs.get_shape())
 
     return segs_model, smpl_model, verts_model, projects_model
-
-
-def convert_to_seg_predict(model, smpl_path):
-    """
-    Converts training indirect learning model to test model that outputs part segmentation.
-    :param model:
-    :return:
-    """
-    # TODO test
-    predict_verts = SMPLLayer(smpl_path, batch_size=1)(model.layers[-5].output)
-    predict_projects = Lambda(persepective_project)([predict_verts, model.layers[-5].output])
-    predict_segs = Lambda(projects_to_seg)(predict_projects)
-    seg_predict_model = Model(inputs=model.input, outputs=predict_segs)
-
-    return seg_predict_model
-
-
-def convert_to_verts_predict(model):
-    """
-    Converts training indirect learning model to test model that outputs vertices.
-    :param model:
-    :return:
-    """
-    pass
 
 
 def classlab(labels, num_classes):
@@ -290,16 +250,16 @@ def train(img_wh, output_img_wh, dataset):
     plt.imshow(y_post[:, :, 13])
     plt.show()
 
-    indirect_learn_model, smpl_test_model, verts_test_model, projects_test_model = build_model(1,
+    segs_model, smpl_model, verts_model, projects_model = build_model(1,
                                        (img_wh, img_wh, 3),
                                        "./neutral_smpl_with_cocoplus_reg.pkl",
                                        output_img_wh,
                                        num_classes)
     # adam_optimiser = Adam(lr=0.0005)
-    # indirect_learn_model.compile(loss='categorical_crossentropy',
+    # segs_model.compile(loss='categorical_crossentropy',
     #                              optimizer=adam_optimiser,
     #                              metrics=['accuracy'])
-    indirect_learn_model.compile(optimizer="adam",
+    segs_model.compile(optimizer="adam",
                                  loss=categorical_focal_loss(gamma=5.0),
                                  metrics=['accuracy'])
 
@@ -332,7 +292,7 @@ def train(img_wh, output_img_wh, dataset):
         #                                             num_classes))
         #         yield (val_data, reshaped_val_labels)
 
-        history = indirect_learn_model.fit_generator(train_data_gen(),
+        history = segs_model.fit_generator(train_data_gen(),
                                             steps_per_epoch=1,
                                             nb_epoch=nb_epoch,
                                             verbose=1)
@@ -344,11 +304,11 @@ def train(img_wh, output_img_wh, dataset):
                                      1,
                                      num_classes,
                                      dataset)
-        print(smpl_test_model.predict(test_data))
+        print(smpl_model.predict(test_data))
         if trials % 10 == 0:
-            test_verts = verts_test_model.predict(test_data)
-            test_projects = projects_test_model.predict(test_data)
-            test_seg = np.reshape(indirect_learn_model.predict(test_data),
+            test_verts = verts_model.predict(test_data)
+            test_projects = projects_model.predict(test_data)
+            test_seg = np.reshape(segs_model.predict(test_data),
                                   (1, output_img_wh, output_img_wh, num_classes))
             test_seg_map = np.argmax(test_seg[0], axis=-1)
             test_gt_seg_map = np.argmax(np.reshape(test_gt[0],
@@ -379,7 +339,7 @@ def train(img_wh, output_img_wh, dataset):
             # plt.show()
 
         # if trials % 100 == 0:
-        #     indirect_learn_model.save('test_models/ups31_'
+        #     segs_model.save('test_models/ups31_'
         #                      + str(nb_epoch * (trials + 1)).zfill(4) + '.hdf5')
 
     print("Finished")

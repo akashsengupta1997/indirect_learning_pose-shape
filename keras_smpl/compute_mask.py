@@ -11,8 +11,10 @@ from keras import backend as K
 
 def compute_mask(batch_projects_with_depth):
     """
-    Outputs N x 6890 tensor of mask_vals: mask_val is either 100 (if vertex is invisible) or
+    Outputs N x 6890 tensor of mask_vals: mask_val is either 500 (if vertex is invisible) or
     1 if visible.
+    During projections to segmentation stage layer (projects_to_seg.py), this mask will be used
+    to ensure that invisible vertices do not affect the segmentation output.
     :param batch_projects_with_depth: N x 6890 x 3 tensor of projected vertices and their
     original depth values i.e. (u, v, z)
     :return:

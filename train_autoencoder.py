@@ -170,13 +170,13 @@ def train(img_wh, output_img_wh, dataset):
 
     if dataset == 'up-s31':
         train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
+        val_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
         # TODO create validation directory
         num_classes = 32
         num_train_images = 8515
 
-    assert os.path.isdir(train_dir), 'Invalid input directory'
-    # assert os.path.isdir(val_image_dir), 'Invalid validation image directory'
-    # assert os.path.isdir(val_label_dir), 'Invalid validation label directory'
+    assert os.path.isdir(train_dir), 'Invalid train directory'
+    assert os.path.isdir(val_dir), 'Invalid validation directory'
 
     train_mask_data_gen_args = dict(
         rotation_range=40,
