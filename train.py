@@ -297,15 +297,13 @@ def train(img_wh, output_img_wh, dataset):
                                             nb_epoch=nb_epoch,
                                             verbose=1)
 
-
-        # TODO remove this testing code
-        test_data, test_gt = generate_data(train_image_generator,
-                                     train_mask_generator,
-                                     1,
-                                     num_classes,
-                                     dataset)
-        print(smpl_model.predict(test_data))
-        if trials % 10 == 0:
+        if trials % 20 == 0:
+            # TODO remove this testing code
+            test_data, test_gt = generate_data(train_image_generator,
+                                               train_mask_generator,
+                                               1,
+                                               num_classes)
+            print(smpl_model.predict(test_data))
             test_verts = verts_model.predict(test_data)
             test_projects = projects_model.predict(test_data)
             test_seg = np.reshape(segs_model.predict(test_data),

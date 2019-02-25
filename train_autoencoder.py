@@ -260,15 +260,14 @@ def train(img_wh, output_img_wh, dataset):
                                            nb_epoch=nb_epoch,
                                            verbose=1)
 
-        # TODO remove this testing code
-        test_input_labels, test_output_labels = generate_data(input_mask_generator,
-                                                              output_mask_generator,
-                                                              1,
-                                                              num_classes)
+        if trials % 20 == 0:
+            # TODO remove this testing code
+            test_input_labels, test_output_labels = generate_data(input_mask_generator,
+                                                                  output_mask_generator,
+                                                                  1,
+                                                                  num_classes)
 
-        print(smpl_test_model.predict(test_input_labels))
-
-        if trials % 50 == 0:
+            print(smpl_test_model.predict(test_input_labels))
             test_verts = verts_test_model.predict(test_input_labels)
             test_projects = projects_test_model.predict(test_input_labels)
             test_seg = np.reshape(segs_model.predict(test_input_labels),
