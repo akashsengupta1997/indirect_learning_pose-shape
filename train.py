@@ -275,8 +275,7 @@ def train(img_wh, output_img_wh, dataset):
                 train_data, train_labels = generate_data(train_image_generator,
                                                          train_mask_generator,
                                                          batch_size,
-                                                         num_classes,
-                                                         dataset)
+                                                         num_classes)
                 reshaped_train_labels = np.reshape(train_labels,
                                                    (batch_size, output_img_wh * output_img_wh,
                                                     num_classes))
