@@ -167,7 +167,7 @@ def generate_data(input_mask_generator, output_mask_generator, n, num_classes):
 
 
 def train(input_wh, output_wh, dataset):
-    batch_size = 4  # TODO change back to 10
+    batch_size = 8
 
     if dataset == 'up-s31':
         # train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
@@ -260,10 +260,10 @@ def train(input_wh, output_wh, dataset):
                                                     num_classes))
                 yield (train_input_labels, reshaped_output_labels)
 
-        # history = segs_model.fit_generator(train_data_gen(),
-        #                                    steps_per_epoch=1,
-        #                                    nb_epoch=1,
-        #                                    verbose=1)
+        history = segs_model.fit_generator(train_data_gen(),
+                                           steps_per_epoch=int(num_train_images/batch_size),
+                                           nb_epoch=1,
+                                           verbose=1)
 
         renderer = SMPLRenderer()
         if trial % 20 == 0:
