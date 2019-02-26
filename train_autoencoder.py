@@ -236,13 +236,12 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
 
     adam_optimiser = Adam(lr=0.0001)
     if multi_gpu:
-        with tf.device("/cpu:0"):
-            segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
-                batch_size,
-                (input_wh, input_wh, num_classes),
-                "./neutral_smpl_with_cocoplus_reg.pkl",
-                output_wh,
-                num_classes)
+        segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
+            batch_size,
+            (input_wh, input_wh, num_classes),
+            "./neutral_smpl_with_cocoplus_reg.pkl",
+            output_wh,
+            num_classes)
         parallel_segs_model = multi_gpu_model(segs_model, gpus=2)
         parallel_segs_model.compile(optimizer=adam_optimiser,
                                     loss=categorical_focal_loss(gamma=5.0),
