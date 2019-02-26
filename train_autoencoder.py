@@ -274,10 +274,17 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
                                                     num_classes))
                 yield (train_input_labels, reshaped_output_labels)
 
-        history = segs_model.fit_generator(train_data_gen(),
-                                           steps_per_epoch=int(num_train_images/batch_size),
-                                           nb_epoch=1,
-                                           verbose=1)
+        if multi_gpu:
+            history = parallel_segs_model.fit_generator(
+                train_data_gen(),
+                steps_per_epoch=int(num_train_images/batch_size),
+                nb_epoch=1,
+                verbose=1)
+        else:
+            history = segs_model.fit_generator(train_data_gen(),
+                                               steps_per_epoch=int(num_train_images/batch_size),
+                                               nb_epoch=1,
+                                               verbose=1)
 
         renderer = SMPLRenderer()
         if trial % 20 == 0:
