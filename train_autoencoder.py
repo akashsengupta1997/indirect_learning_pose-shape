@@ -90,7 +90,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         delta1 = IEF_layer_1(state1)
         delta1 = IEF_layer_2(delta1)
         delta1 = IEF_layer_3(delta1)
-        delta1 = Lambda(lambda x: x * 0.05)(delta1)
+        delta1 = Lambda(lambda x: x * 0.03)(delta1)
         param2 = Add()([param1, delta1])
         state2 = Concatenate()([img_features, param2])
 
@@ -98,7 +98,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         delta2 = IEF_layer_1(state2)
         delta2 = IEF_layer_2(delta2)
         delta2 = IEF_layer_3(delta2)
-        delta2 = Lambda(lambda x: x * 0.05)(delta2)
+        delta2 = Lambda(lambda x: x * 0.03)(delta2)
         param3 = Add()([param2, delta2])
         state3 = Concatenate()([img_features, param3])
 
@@ -106,7 +106,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         delta3 = IEF_layer_1(state3)
         delta3 = IEF_layer_2(delta3)
         delta3 = IEF_layer_3(delta3)
-        delta3 = Lambda(lambda x: x * 0.05)(delta3)
+        delta3 = Lambda(lambda x: x * 0.03)(delta3)
         final_param = Add()([param3, delta3])
 
     else:
@@ -158,7 +158,8 @@ def generate_data(input_mask_generator, output_mask_generator, n, num_classes):
         y = output_mask_generator.next()
         j = 0
         while j < y.shape[0]:
-            input_labels.append(classlab(x[j, :, :, :].astype(np.uint8), num_classes))
+            # input_labels.append(classlab(x[j, :, :, :].astype(np.uint8), num_classes))
+            input_labels.append(x[j, :, :, :])
             output_labels.append(classlab(y[j, :, :, :].astype(np.uint8), num_classes))
             j = j + 1
             i = i + 1
@@ -172,8 +173,8 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
     batch_size = 2
 
     if dataset == 'up-s31':
-        # train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
-        train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded/masks"
+        train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
+        # train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded/masks"
         # val_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
         monitor_dir = "./monitor_train/monitor_train_images"
         # TODO create validation directory
@@ -192,16 +193,21 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
         horizontal_flip=True,
         fill_mode='nearest')
 
+    val_input_mask_data_gen_args = dict(
+        fill_mode='nearest',
+        rescale=(1.0/(num_classes-1)))
+
     val_mask_data_gen_args = dict(
         fill_mode='nearest')
 
     # TODO add back augmentation
+    train_input_mask_datagen = ImageDataGenerator(**val_input_mask_data_gen_args)
     train_mask_datagen = ImageDataGenerator(**val_mask_data_gen_args)
     # val_image_datagen = ImageDataGenerator(**val_image_data_gen_args)
     # val_mask_datagen = ImageDataGenerator(**val_mask_data_gen_args)
 
     seed = 1
-    input_mask_generator = train_mask_datagen.flow_from_directory(
+    input_mask_generator = train_input_mask_datagen.flow_from_directory(
         train_dir,
         batch_size=batch_size,
         target_size=(input_wh, input_wh),
@@ -219,26 +225,27 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
 
     print('Generators loaded.')
 
-    # # For testing data loading
-    # x = input_mask_generator.next()
-    # y = output_mask_generator.next()
-    # plt.figure(1)
-    # plt.subplot(221)
-    # plt.imshow(x[0, :, :, 0])
-    # plt.subplot(222)
-    # plt.imshow(y[0, :, :, 0])
-    # y_post = classlab(y[0], num_classes)
-    # plt.subplot(223)
-    # plt.imshow(y_post[:, :, 0])
-    # plt.subplot(224)
-    # plt.imshow(y_post[:, :, 13])
-    # plt.show()
+    # For testing data loading
+    x = input_mask_generator.next()
+    y = output_mask_generator.next()
+    plt.figure(1)
+    plt.subplot(221)
+    plt.imshow(x[0, :, :, 0])
+    plt.subplot(222)
+    plt.imshow(y[0, :, :, 0])
+    y_post = classlab(y[0], num_classes)
+    plt.subplot(223)
+    plt.imshow(y_post[:, :, 0])
+    plt.subplot(224)
+    plt.imshow(y_post[:, :, 13])
+    plt.show()
 
     adam_optimiser = Adam(lr=0.0001)
     if multi_gpu:
         segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
             batch_size,
-            (input_wh, input_wh, num_classes),
+            # (input_wh, input_wh, num_classes),
+            (input_wh, input_wh, 1),
             "./neutral_smpl_with_cocoplus_reg.pkl",
             output_wh,
             num_classes)
@@ -249,7 +256,8 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
     else:
         segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
             batch_size,
-            (input_wh, input_wh, num_classes),
+            # (input_wh, input_wh, num_classes),
+            (input_wh, input_wh, 1),
             "./neutral_smpl_with_cocoplus_reg.pkl",
             output_wh,
             num_classes)
@@ -269,8 +277,8 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
                                                                         batch_size,
                                                                         num_classes)
                 reshaped_output_labels = np.reshape(train_output_labels,
-                                                   (batch_size, output_wh * output_wh,
-                                                    num_classes))
+                                                    (batch_size, output_wh * output_wh,
+                                                     num_classes))
                 yield (train_input_labels, reshaped_output_labels)
 
         if multi_gpu:
@@ -380,4 +388,4 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
     print("Finished")
 
 
-train(256, 96, 'up-s31')
+train(256, 64, 'up-s31')
