@@ -70,7 +70,7 @@ def build_debug_model(batch_size, smpl_path, output_img_wh, num_classes):
     num_total_params = num_smpl_params + num_camera_params
 
     index_inputs = Input(shape=(1,))
-    smpls = Embedding(15, num_total_params, input_length=1)(index_inputs)
+    smpls = Embedding(25, num_total_params, input_length=1)(index_inputs)
     smpls = Lambda(lambda smpls: K.squeeze(smpls, axis=1))(smpls)
     smpls = Lambda(load_mean_set_cam_params)(smpls)
 
@@ -93,7 +93,7 @@ def build_debug_model(batch_size, smpl_path, output_img_wh, num_classes):
 
 def train(output_wh, num_classes, num_indices):
     # train_indices = np.arange(num_indices)
-    train_indices = np.array([2, 10, 11])
+    train_indices = np.array([17, 21, 22])
     labels = load_masks_from_indices(train_indices, (output_wh, output_wh))
     train_labels = np.reshape(labels, (-1, output_wh*output_wh, num_classes))
     segs_model, smpl_model, verts_model, projects_model = build_debug_model(num_indices,
@@ -141,4 +141,4 @@ def train(output_wh, num_classes, num_indices):
 
 
 
-train(128, 32, 3)
+train(96, 32, 3)
