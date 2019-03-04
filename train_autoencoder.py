@@ -19,6 +19,8 @@ from keras_smpl.concat_mean_param import concat_mean_param
 from keras_smpl.set_cam_params import load_mean_set_cam_params
 from keras_smpl.compute_mask import compute_mask
 
+from generators.image_generator_with_fname import ImagesWithFnames
+
 from encoders.encoder_enet_simple import build_enet
 from renderer import SMPLRenderer
 
@@ -151,36 +153,43 @@ def classlab(labels, num_classes):
 
 def generate_data(input_mask_generator, output_mask_generator, n, num_classes):
     input_labels = []
-    output_labels = []
+    output_seg_labels = []
+    output_joints_labels = []
+    joints_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-3d/"
     i = 0
     while i < n:
-        x = input_mask_generator.next()
+        x, fnames = input_mask_generator.next()
         y = output_mask_generator.next()
         j = 0
         while j < y.shape[0]:
             # input_labels.append(classlab(x[j, :, :, :].astype(np.uint8), num_classes))
+            # fname = fnames[j]
+            # id = fname[6:11]
+            # joints_path = os.path.join(joints_dir, id + "_joints.npy")
+            # joints = np.load(joints_path)
+
             input_labels.append(x[j, :, :, :])
-            output_labels.append(classlab(y[j, :, :, :].astype(np.uint8), num_classes))
+            output_seg_labels.append(classlab(y[j, :, :, :].astype(np.uint8), num_classes))
             j = j + 1
             i = i + 1
             if i >= n:
                 break
 
-    return np.array(input_labels), np.array(output_labels)
+    return np.array(input_labels), np.array(output_seg_labels)
 
 
 def train(input_wh, output_wh, dataset, multi_gpu=False):
-    batch_size = 2
+    batch_size = 3
 
     if dataset == 'up-s31':
-        train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
+        train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks2"
         # train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded/masks"
         # val_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
         monitor_dir = "./monitor_train/monitor_train_images"
         # TODO create validation directory
         num_classes = 32
         # num_train_images = 6813
-        num_train_images = 2
+        num_train_images = 31
 
     assert os.path.isdir(train_dir), 'Invalid train directory'
     # assert os.path.isdir(val_dir), 'Invalid validation directory'
@@ -208,13 +217,13 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
     # val_mask_datagen = ImageDataGenerator(**val_mask_data_gen_args)
 
     seed = 1
-    input_mask_generator = train_input_mask_datagen.flow_from_directory(
-        train_dir,
-        batch_size=batch_size,
-        target_size=(input_wh, input_wh),
-        class_mode=None,
-        color_mode="grayscale",
-        seed=seed)
+    # input_mask_generator = train_input_mask_datagen.flow_from_directory(
+    #     train_dir,
+    #     batch_size=batch_size,
+    #     target_size=(input_wh, input_wh),
+    #     class_mode=None,
+    #     color_mode="grayscale",
+    #     seed=seed)
 
     output_mask_generator = train_mask_datagen.flow_from_directory(
         train_dir,
@@ -224,11 +233,21 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
         color_mode="grayscale",
         seed=seed)
 
+    input_mask_generator = ImagesWithFnames(train_dir,
+                                                 train_input_mask_datagen,
+                                                 batch_size=batch_size,
+                                                 target_size=(input_wh, input_wh),
+                                                 class_mode=None,
+                                                 color_mode='grayscale',
+                                                 seed=seed)
+
     print('Generators loaded.')
 
     # # For testing data loading
-    # x = input_mask_generator.next()
+    # x, fnames = input_mask_generator.next()
     # y = output_mask_generator.next()
+    #
+    # print(fnames)
     # plt.figure(1)
     # plt.subplot(221)
     # plt.imshow(x[0, :, :, 0])
@@ -239,7 +258,6 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
     # plt.imshow(y_post[:, :, 0])
     # plt.subplot(224)
     # plt.imshow(y_post[:, :, 13])
-    # plt.show()
 
     adam_optimiser = Adam(lr=0.0001)
     if multi_gpu:
@@ -294,89 +312,89 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
                                                verbose=1)
 
         renderer = SMPLRenderer()
-        if trial % 20 == 0:
-
-            inputs = []
-            for fname in sorted(os.listdir(monitor_dir)):
-                if fname.endswith(".png"):
-                    input_labels = cv2.imread(os.path.join(monitor_dir, fname), 0)
-                    input_labels = cv2.resize(input_labels, (input_wh, input_wh),
-                                              interpolation=cv2.INTER_NEAREST)
-                    input_labels = np.expand_dims(input_labels, axis=-1)
-                    input_labels = input_labels * (1.0/(num_classes-1))
-                    inputs.append(input_labels)
-
-            input_mask_array = np.array(inputs)
-            input_mask_array = input_mask_array[:batch_size, :, :, :]
-
-            smpls = smpl_model.predict(input_mask_array)
-            verts = verts_model.predict(input_mask_array)
-            projects = projects_model.predict(input_mask_array)
-            segs = np.reshape(segs_model.predict(input_mask_array),
-                              [-1, output_wh, output_wh, num_classes])
-            seg_maps = np.argmax(segs, axis=-1)
-
-            print(smpls[0])
-            i = 0
-            while i < batch_size:
-                plt.figure(1)
-                plt.clf()
-                plt.imshow(seg_maps[i])
-                plt.savefig("./monitor_train/seg_" + str(trial) + "_" + str(i) + ".png")
-                plt.figure(2)
-                plt.clf()
-                plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
-                plt.gca().set_aspect('equal', adjustable='box')
-                plt.savefig("./monitor_train/verts_" + str(trial) + "_" + str(i) + ".png")
-                plt.figure(3)
-                rend_img = renderer(verts=verts[i], render_seg=False)
-                plt.imshow(rend_img)
-                plt.savefig("./monitor_train/rend_" + str(trial) + "_" + str(i) + ".png")
-
-                if trial == 0:
-                    plt.figure(4)
-                    plt.clf()
-                    plt.imshow(input_mask_array[i, :, :, 0])
-                    plt.savefig("./monitor_train/gt_seg_" + str(i) + ".png")
-                i += 1
-
-            # # TODO remove this testing code
-            # test_input_labels, test_output_labels = generate_data(input_mask_generator,
-            #                                                       output_mask_generator,
-            #                                                       2,
-            #                                                       num_classes)
+        if trial % 50 == 0:
             #
-            # print(smpl_model.predict(test_input_labels)[0])
-            # test_verts = verts_model.predict(test_input_labels)
-            # test_projects = projects_model.predict(test_input_labels)
-            # test_seg = np.reshape(segs_model.predict(test_input_labels),
-            #                       (-1, output_wh, output_wh, num_classes))
-            # test_seg_maps = np.argmax(test_seg, axis=-1)
-            # test_gt_seg_maps = np.argmax(np.reshape(test_output_labels,
-            #                                        (-1, output_wh, output_wh,
-            #                                         num_classes)), axis=-1)
+            # inputs = []
+            # for fname in sorted(os.listdir(monitor_dir)):
+            #     if fname.endswith(".png"):
+            #         input_labels = cv2.imread(os.path.join(monitor_dir, fname), 0)
+            #         input_labels = cv2.resize(input_labels, (input_wh, input_wh),
+            #                                   interpolation=cv2.INTER_NEAREST)
+            #         input_labels = np.expand_dims(input_labels, axis=-1)
+            #         input_labels = input_labels * (1.0/(num_classes-1))
+            #         inputs.append(input_labels)
             #
-            # for i in range(batch_size):
-            #     rend_img_keras_model = renderer(verts=test_verts[i], render_seg=False)
+            # input_mask_array = np.array(inputs)
+            # input_mask_array = input_mask_array[:batch_size, :, :, :]
+            #
+            # smpls = smpl_model.predict(input_mask_array)
+            # verts = verts_model.predict(input_mask_array)
+            # projects = projects_model.predict(input_mask_array)
+            # segs = np.reshape(segs_model.predict(input_mask_array),
+            #                   [-1, output_wh, output_wh, num_classes])
+            # seg_maps = np.argmax(segs, axis=-1)
+            #
+            # print(smpls[0])
+            # i = 0
+            # while i < batch_size:
             #     plt.figure(1)
             #     plt.clf()
-            #     plt.imshow(rend_img_keras_model)
-            #     plt.savefig("./test_outputs/rend_" + str(trial) + "_" + str(i) + ".png")
+            #     plt.imshow(seg_maps[i])
+            #     plt.savefig("./monitor_train/seg_" + str(trial) + "_" + str(i) + ".png")
             #     plt.figure(2)
             #     plt.clf()
-            #     plt.scatter(test_projects[i, :, 0], test_projects[i, :, 1], s=1)
+            #     plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
             #     plt.gca().set_aspect('equal', adjustable='box')
-            #     plt.savefig("./test_outputs/verts_" + str(trial) + "_" + str(i) + ".png")
+            #     plt.savefig("./monitor_train/verts_" + str(trial) + "_" + str(i) + ".png")
             #     plt.figure(3)
-            #     plt.clf()
-            #     plt.imshow(test_seg_maps[i])
-            #     plt.savefig("./test_outputs/seg_" + str(trial) + "_" + str(i) + ".png")
+            #     rend_img = renderer(verts=verts[i], render_seg=False)
+            #     plt.imshow(rend_img)
+            #     plt.savefig("./monitor_train/rend_" + str(trial) + "_" + str(i) + ".png")
             #
             #     if trial == 0:
-            #         plt.figure(5)
+            #         plt.figure(4)
             #         plt.clf()
-            #         plt.imshow(test_gt_seg_maps[i])
-            #         plt.savefig("./test_outputs/gt_seg" + "_" + str(i) + ".png")
+            #         plt.imshow(input_mask_array[i, :, :, 0])
+            #         plt.savefig("./monitor_train/gt_seg_" + str(i) + ".png")
+            #     i += 1
+
+            # TODO remove this testing code
+            test_input_labels, test_output_labels = generate_data(input_mask_generator,
+                                                                  output_mask_generator,
+                                                                  2,
+                                                                  num_classes)
+
+            print(smpl_model.predict(test_input_labels)[0])
+            test_verts = verts_model.predict(test_input_labels)
+            test_projects = projects_model.predict(test_input_labels)
+            test_seg = np.reshape(segs_model.predict(test_input_labels),
+                                  (-1, output_wh, output_wh, num_classes))
+            test_seg_maps = np.argmax(test_seg, axis=-1)
+            test_gt_seg_maps = np.argmax(np.reshape(test_output_labels,
+                                                   (-1, output_wh, output_wh,
+                                                    num_classes)), axis=-1)
+
+            for i in range(batch_size):
+                rend_img_keras_model = renderer(verts=test_verts[i], render_seg=False)
+                plt.figure(1)
+                plt.clf()
+                plt.imshow(rend_img_keras_model)
+                plt.savefig("./test_outputs/rend_" + str(trial) + "_" + str(i) + ".png")
+                plt.figure(2)
+                plt.clf()
+                plt.scatter(test_projects[i, :, 0], test_projects[i, :, 1], s=1)
+                plt.gca().set_aspect('equal', adjustable='box')
+                plt.savefig("./test_outputs/verts_" + str(trial) + "_" + str(i) + ".png")
+                plt.figure(3)
+                plt.clf()
+                plt.imshow(test_seg_maps[i])
+                plt.savefig("./test_outputs/seg_" + str(trial) + "_" + str(i) + ".png")
+
+                if trial == 0:
+                    plt.figure(5)
+                    plt.clf()
+                    plt.imshow(test_gt_seg_maps[i])
+                    plt.savefig("./test_outputs/gt_seg" + "_" + str(i) + ".png")
 
 
         # if trial % 100 == 0:
@@ -386,4 +404,4 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
     print("Finished")
 
 
-train(256, 96, 'up-s31')
+train(256, 64, 'up-s31')

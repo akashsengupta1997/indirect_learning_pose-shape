@@ -21,9 +21,10 @@ def undo_chumpy(x):
 
 
 class SMPLLayer(Layer):
-    def __init__(self, pkl_path, batch_size=8, dtype='float32', **kwargs):
+    def __init__(self, pkl_path, batch_size=8, dtype='float32', joint_type='lsp', **kwargs):
         self.pkl_path = pkl_path
         self.dtype = dtype
+        self.joint_type = joint_type
         self.batch_size = batch_size
         super(SMPLLayer, self).__init__(**kwargs)
 
@@ -76,6 +77,14 @@ class SMPLLayer(Layer):
             undo_chumpy(dd['weights']),
             name='lbs_weights',
             dtype=self.dtype)
+
+        # This returns 19 keypoints: 6890 x 19
+        self.joint_regressor = K.variable(
+            dd['cocoplus_regressor'].T.todense(),
+            name="cocoplus_regressor",
+            dtype=self.dtype)
+        if self.joint_type == 'lsp':  # 14 LSP joints!
+            self.joint_regressor = self.joint_regressor[:, :14]
 
         # Number of camera parameters
         self.num_cam = 4
@@ -134,6 +143,13 @@ class SMPLLayer(Layer):
         v_homo = tf.matmul(T, tf.expand_dims(v_posed_homo, -1))
 
         verts = v_homo[:, :, :3, 0]
+
+        # # Get cocoplus or lsp joints:
+        # joint_x = tf.matmul(verts[:, :, 0], self.joint_regressor)
+        # joint_y = tf.matmul(verts[:, :, 1], self.joint_regressor)
+        # joint_z = tf.matmul(verts[:, :, 2], self.joint_regressor)
+        # joints = tf.stack([joint_x, joint_y, joint_z], axis=2)
+
         return verts
 
     def compute_output_shape(self, input_shape):
