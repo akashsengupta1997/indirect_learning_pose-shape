@@ -279,9 +279,14 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
             "./neutral_smpl_with_cocoplus_reg.pkl",
             output_wh,
             num_classes)
+
+        run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        run_metadata = tf.RunMetadata()
         segs_model.compile(optimizer=adam_optimiser,
                            loss=categorical_focal_loss(gamma=5.0),
-                           metrics=['accuracy'])
+                           metrics=['accuracy'],
+                           options=run_options,
+                           run_metadata=run_metadata)
 
     print("Model compiled.")
 
@@ -310,6 +315,12 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
                                                steps_per_epoch=int(num_train_images/batch_size),
                                                nb_epoch=1,
                                                verbose=1)
+
+            from tensorflow.python.client import timeline
+            tl = timeline.Timeline(run_metadata.step_stats)
+            ctf = tl.generate_chrome_trace_format()
+            with open('timeline.json', 'w') as f:
+                f.write(ctf)
 
         renderer = SMPLRenderer()
         if trial % 50 == 0:
@@ -404,4 +415,4 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
     print("Finished")
 
 
-train(256, 64, 'up-s31')
+train(256, 96, 'up-s31')
