@@ -116,12 +116,15 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         smpl = Dense(1024, activation='relu')(smpl)
         smpl = Dense(num_total_params, activation='linear')(smpl)
         smpl = Lambda(lambda x: x * 0.1, name="scale_down")(smpl)
-        final_param = Lambda(load_mean_set_cam_params)(smpl)
+        final_param = Lambda(load_mean_set_cam_params,
+                             arguments={'img_wh': output_img_wh})(smpl)
 
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
     projects_with_depth = Lambda(orthographic_project2, name='project')([verts, final_param])
     masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
-    segs = Lambda(projects_to_seg, name='segment')([projects_with_depth, masks])
+    segs = Lambda(projects_to_seg,
+                  arguments={'img_wh': output_img_wh},
+                  name='segment')([projects_with_depth, masks])
     segs = Reshape((output_img_wh * output_img_wh, num_classes))(segs)
     segs = Activation('softmax')(segs)
 
