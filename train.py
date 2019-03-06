@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import cv2
 from matplotlib import pyplot as plt
 
 import tensorflow as tf
@@ -155,16 +156,18 @@ def generate_data(image_generator, mask_generator, n, num_classes):
     return np.array(images), np.array(labels)
 
 
-def train(img_wh, output_img_wh, dataset):
-    batch_size = 2
+def train(input_wh, output_wh, dataset):
+    batch_size = 3
 
     if dataset == 'up-s31':
         train_image_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/images"
         train_label_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
+        monitor_dir = "./full_network_monitor_train/monitor_train_images"
         # TODO create validation directory
         num_classes = 32
         # num_train_images = 8515
-        num_train_images = 2
+        num_train_images = 31
+        # num_train_images = 2
 
     assert os.path.isdir(train_image_dir), 'Invalid image directory'
     assert os.path.isdir(train_label_dir), 'Invalid label directory'
@@ -208,14 +211,14 @@ def train(img_wh, output_img_wh, dataset):
     train_image_generator = train_image_datagen.flow_from_directory(
         train_image_dir,
         batch_size=batch_size,
-        target_size=(img_wh, img_wh),
+        target_size=(input_wh, input_wh),
         class_mode=None,
         seed=seed)
 
     train_mask_generator = train_mask_datagen.flow_from_directory(
         train_label_dir,
         batch_size=batch_size,
-        target_size=(output_img_wh, output_img_wh),
+        target_size=(output_wh, output_wh),
         class_mode=None,
         color_mode="grayscale",
         seed=seed)
@@ -256,9 +259,9 @@ def train(img_wh, output_img_wh, dataset):
 
     segs_model, smpl_model, verts_model, projects_model = build_model(
         batch_size,
-        (img_wh, img_wh, 3),
+        (input_wh, input_wh, 3),
         "./neutral_smpl_with_cocoplus_reg.pkl",
-        output_img_wh,
+        output_wh,
         num_classes)
 
     adam_optimiser = Adam(lr=0.0001)
@@ -268,8 +271,8 @@ def train(img_wh, output_img_wh, dataset):
 
     print("Model compiled.")
 
-    for trials in range(4000):
-        print("Fitting", trials)
+    for trial in range(4000):
+        print("Fitting", trial)
 
         def train_data_gen():
             while True:
@@ -278,7 +281,7 @@ def train(img_wh, output_img_wh, dataset):
                                                          batch_size,
                                                          num_classes)
                 reshaped_train_labels = np.reshape(train_labels,
-                                                   (batch_size, output_img_wh * output_img_wh,
+                                                   (batch_size, output_wh * output_wh,
                                                     num_classes))
                 yield (train_data, reshaped_train_labels)
 
@@ -297,48 +300,94 @@ def train(img_wh, output_img_wh, dataset):
                                             nb_epoch=1,
                                             verbose=1)
 
-        if trials % 50 == 0:
-            # TODO remove this testing code
-            test_data, test_gt = generate_data(train_image_generator,
-                                               train_mask_generator,
-                                               batch_size,
-                                               num_classes)
-            print(smpl_model.predict(test_data))
-            test_verts = verts_model.predict(test_data)
-            test_projects = projects_model.predict(test_data)
-            test_seg = np.reshape(segs_model.predict(test_data),
-                                  (1, output_img_wh, output_img_wh, num_classes))
-            test_seg_map = np.argmax(test_seg[0], axis=-1)
-            test_gt_seg_map = np.argmax(np.reshape(test_gt[0],
-                                                   (output_img_wh, output_img_wh,
-                                                    num_classes)), axis=-1)
-            renderer = SMPLRenderer()
-            rend_img_keras_model = renderer(verts=test_verts[0], render_seg=False)
-            plt.figure(1)
-            plt.clf()
-            plt.imshow(rend_img_keras_model)
-            plt.savefig("./test_outputs/rend_" + str(trials) + ".png")
-            plt.figure(2)
-            plt.clf()
-            plt.scatter(test_projects[0, :, 0], test_projects[0, :, 1], s=1)
-            plt.gca().set_aspect('equal', adjustable='box')
-            plt.savefig("./test_outputs/verts_" + str(trials) + ".png")
-            plt.figure(3)
-            plt.clf()
-            plt.imshow(test_seg_map)
-            plt.savefig("./test_outputs/seg_" + str(trials) + ".png")
+        renderer = SMPLRenderer()
 
-            if trials == 0:
-                plt.figure(5)
+        if trial % 50 == 0:
+            inputs = []
+            for fname in sorted(os.listdir(monitor_dir)):
+                if fname.endswith(".png"):
+                    input_image = cv2.imread(os.path.join(monitor_dir, fname), 1)
+                    input_image = cv2.resize(input_image,
+                                             (input_wh, input_wh),
+                                             interpolation=cv2.INTER_NEAREST)
+                    input_image = input_image[..., ::-1]
+                    input_image = np.expand_dims(input_image, axis=-1)
+                    input_image = input_image * (1.0/255)
+                    inputs.append(input_image)
+
+            input_images_array = np.array(inputs)
+            input_images_array = input_images_array[:batch_size, :, :, :]
+
+            smpls = smpl_model.predict(input_images_array)
+            verts = verts_model.predict(input_images_array)
+            projects = projects_model.predict(input_images_array)
+            segs = np.reshape(segs_model.predict(input_images_array),
+                              [-1, output_wh, output_wh, num_classes])
+            seg_maps = np.argmax(segs, axis=-1)
+
+            print(smpls[0])
+            i = 0
+            while i < batch_size:
+                plt.figure(1)
                 plt.clf()
-                plt.imshow(test_gt_seg_map)
-                plt.savefig("./test_outputs/gt_seg.png")
+                plt.imshow(seg_maps[i])
+                plt.savefig("./full_network_monitor_train/seg_" + str(trial) + "_" + str(i) + ".png")
+                plt.figure(2)
+                plt.clf()
+                plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
+                plt.gca().set_aspect('equal', adjustable='box')
+                plt.savefig("./full_network_monitor_train/verts_" + str(trial) + "_" + str(i) + ".png")
+                plt.figure(3)
+                rend_img = renderer(verts=verts[i], render_seg=False)
+                plt.imshow(rend_img)
+                plt.savefig("./full_network_monitor_train/rend_" + str(trial) + "_" + str(i) + ".png")
 
-            # plt.show()
+                if trial == 0:
+                    plt.figure(4)
+                    plt.clf()
+                    plt.imshow(input_images_array[i, :, :, 0])
+                    plt.savefig("./full_network_monitor_train/image_" + str(i) + ".png")
+                i += 1
+            #
+            # # TODO remove this testing code
+            # test_data, test_gt = generate_data(train_image_generator,
+            #                                    train_mask_generator,
+            #                                    batch_size,
+            #                                    num_classes)
+            # print(smpl_model.predict(test_data))
+            # test_verts = verts_model.predict(test_data)
+            # test_projects = projects_model.predict(test_data)
+            # test_seg = np.reshape(segs_model.predict(test_data),
+            #                       (-1, output_wh, output_wh, num_classes))
+            # test_seg_map = np.argmax(test_seg[0], axis=-1)
+            # test_gt_seg_map = np.argmax(np.reshape(test_gt[0],
+            #                                        (output_wh, output_wh,
+            #                                         num_classes)), axis=-1)
+            # renderer = SMPLRenderer()
+            # rend_img_keras_model = renderer(verts=test_verts[0], render_seg=False)
+            # plt.figure(1)
+            # plt.clf()
+            # plt.imshow(rend_img_keras_model)
+            # plt.savefig("./test_outputs/rend_" + str(trial) + ".png")
+            # plt.figure(2)
+            # plt.clf()
+            # plt.scatter(test_projects[0, :, 0], test_projects[0, :, 1], s=1)
+            # plt.gca().set_aspect('equal', adjustable='box')
+            # plt.savefig("./test_outputs/verts_" + str(trial) + ".png")
+            # plt.figure(3)
+            # plt.clf()
+            # plt.imshow(test_seg_map)
+            # plt.savefig("./test_outputs/seg_" + str(trial) + ".png")
+            #
+            # if trial == 0:
+            #     plt.figure(5)
+            #     plt.clf()
+            #     plt.imshow(test_gt_seg_map)
+            #     plt.savefig("./test_outputs/gt_seg.png")
 
-        # if trials % 100 == 0:
+        # if trial % 100 == 0:
         #     segs_model.save('test_models/ups31_'
-        #                      + str(nb_epoch * (trials + 1)).zfill(4) + '.hdf5')
+        #                      + str(nb_epoch * (trial + 1)).zfill(4) + '.hdf5')
 
     print("Finished")
 
