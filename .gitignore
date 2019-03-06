@@ -6,5 +6,7 @@
 .DS_Store
 
 *.png
+*.pdf
+*.pages
 
 tf_smpl/*

@@ -115,9 +115,13 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         smpl = Dense(2048, activation='relu')(img_features)
         smpl = Dense(1024, activation='relu')(smpl)
         smpl = Dense(num_total_params, activation='linear')(smpl)
-        smpl = Lambda(lambda x: x * 0.1, name="scale_down")(smpl)
+        smpl = Lambda(lambda x: x * 0.01, name="scale_down")(smpl)
         final_param = Lambda(load_mean_set_cam_params,
                              arguments={'img_wh': output_img_wh})(smpl)
+
+    # TODO add another model (model_to_save) that has smpl as output, this will be the model
+    # that is saved during training and used during predictions - don't need to worry about
+    # custom objects as just saving the encoder
 
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
     projects_with_depth = Lambda(orthographic_project2, name='project')([verts, final_param])
@@ -283,13 +287,9 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
             output_wh,
             num_classes)
 
-        run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-        run_metadata = tf.RunMetadata()
         segs_model.compile(optimizer=adam_optimiser,
                            loss=categorical_focal_loss(gamma=5.0),
-                           metrics=['accuracy'],
-                           options=run_options,
-                           run_metadata=run_metadata)
+                           metrics=['accuracy'])
 
     print("Model compiled.")
 
@@ -318,12 +318,6 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
                                                steps_per_epoch=int(num_train_images/batch_size),
                                                nb_epoch=1,
                                                verbose=1)
-
-            from tensorflow.python.client import timeline
-            tl = timeline.Timeline(run_metadata.step_stats)
-            ctf = tl.generate_chrome_trace_format()
-            with open('timeline.json', 'w') as f:
-                f.write(ctf)
 
         renderer = SMPLRenderer()
         if trial % 50 == 0:

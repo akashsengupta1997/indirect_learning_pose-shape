@@ -83,16 +83,19 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
         final_param = Add()([param3, delta3])
 
     else:
-        smpl = Dense(2048, activation='relu')(img_features)
+        smpl = Dense(1024, activation='relu')(img_features)
         smpl = Dense(1024, activation='relu')(smpl)
         smpl = Dense(num_total_params, activation='linear')(smpl)
-        smpl = Lambda(lambda x: x * 0.1, name="scale_down")(smpl)
-        final_param = Lambda(load_mean_set_cam_params)(smpl)
+        smpl = Lambda(lambda x: x * 0.01, name="scale_down")(smpl)
+        final_param = Lambda(load_mean_set_cam_params,
+                             arguments={'img_wh': output_img_wh})(smpl)
 
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
     projects_with_depth = Lambda(orthographic_project2, name='project')([verts, final_param])
     masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
-    segs = Lambda(projects_to_seg, name='segment')([projects_with_depth, masks])
+    segs = Lambda(projects_to_seg,
+                  arguments={'img_wh': output_img_wh},
+                  name='segment')([projects_with_depth, masks])
     segs = Reshape((output_img_wh * output_img_wh, num_classes))(segs)
     segs = Activation('softmax')(segs)
 
@@ -153,14 +156,15 @@ def generate_data(image_generator, mask_generator, n, num_classes):
 
 
 def train(img_wh, output_img_wh, dataset):
-    batch_size = 1  # TODO change back to 10
+    batch_size = 2
 
     if dataset == 'up-s31':
         train_image_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/images"
         train_label_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
         # TODO create validation directory
         num_classes = 32
-        num_train_images = 8515
+        # num_train_images = 8515
+        num_train_images = 2
 
     assert os.path.isdir(train_image_dir), 'Invalid image directory'
     assert os.path.isdir(train_label_dir), 'Invalid label directory'
@@ -233,41 +237,38 @@ def train(img_wh, output_img_wh, dataset):
 
     print('Generators loaded.')
 
-    # For testing data loading
-    x = train_image_generator.next()
-    y = train_mask_generator.next()
-    print('x shape out of training generator', x.shape)  # should = (batch_size, img_hw, img_hw, 3)
-    print('y shape out of training generator', y.shape)  # should = (batch_size, dec_hw, dec_hw, 1)
-    plt.figure(1)
-    plt.subplot(221)
-    plt.imshow(x[0, :, :, :])
-    plt.subplot(222)
-    plt.imshow(y[0, :, :, 0])
-    y_post = classlab(y[0], num_classes)
-    plt.subplot(223)
-    plt.imshow(y_post[:, :, 0])
-    plt.subplot(224)
-    plt.imshow(y_post[:, :, 13])
-    plt.show()
+    # # For testing data loading
+    # x = train_image_generator.next()
+    # y = train_mask_generator.next()
+    # print('x shape out of training generator', x.shape)  # should = (batch_size, img_hw, img_hw, 3)
+    # print('y shape out of training generator', y.shape)  # should = (batch_size, dec_hw, dec_hw, 1)
+    # plt.figure(1)
+    # plt.subplot(221)
+    # plt.imshow(x[0, :, :, :])
+    # plt.subplot(222)
+    # plt.imshow(y[0, :, :, 0])
+    # y_post = classlab(y[0], num_classes)
+    # plt.subplot(223)
+    # plt.imshow(y_post[:, :, 0])
+    # plt.subplot(224)
+    # plt.imshow(y_post[:, :, 13])
+    # plt.show()
 
-    segs_model, smpl_model, verts_model, projects_model = build_model(1,
-                                       (img_wh, img_wh, 3),
-                                       "./neutral_smpl_with_cocoplus_reg.pkl",
-                                       output_img_wh,
-                                       num_classes)
-    # adam_optimiser = Adam(lr=0.0005)
-    # segs_model.compile(loss='categorical_crossentropy',
-    #                              optimizer=adam_optimiser,
-    #                              metrics=['accuracy'])
-    segs_model.compile(optimizer="adam",
-                                 loss=categorical_focal_loss(gamma=5.0),
-                                 metrics=['accuracy'])
+    segs_model, smpl_model, verts_model, projects_model = build_model(
+        batch_size,
+        (img_wh, img_wh, 3),
+        "./neutral_smpl_with_cocoplus_reg.pkl",
+        output_img_wh,
+        num_classes)
 
+    adam_optimiser = Adam(lr=0.0001)
+    segs_model.compile(optimizer=adam_optimiser,
+                       loss=categorical_focal_loss(gamma=5.0),
+                       metrics=['accuracy'])
 
     print("Model compiled.")
 
     for trials in range(4000):
-        nb_epoch = 1
         print("Fitting", trials)
 
         def train_data_gen():
@@ -292,15 +293,15 @@ def train(img_wh, output_img_wh, dataset):
         #         yield (val_data, reshaped_val_labels)
 
         history = segs_model.fit_generator(train_data_gen(),
-                                            steps_per_epoch=1,
-                                            nb_epoch=nb_epoch,
+                                            steps_per_epoch=int(num_train_images/batch_size),
+                                            nb_epoch=1,
                                             verbose=1)
 
-        if trials % 20 == 0:
+        if trials % 50 == 0:
             # TODO remove this testing code
             test_data, test_gt = generate_data(train_image_generator,
                                                train_mask_generator,
-                                               1,
+                                               batch_size,
                                                num_classes)
             print(smpl_model.predict(test_data))
             test_verts = verts_model.predict(test_data)
