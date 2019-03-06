@@ -311,7 +311,6 @@ def train(input_wh, output_wh, dataset):
                                              (input_wh, input_wh),
                                              interpolation=cv2.INTER_NEAREST)
                     input_image = input_image[..., ::-1]
-                    input_image = np.expand_dims(input_image, axis=-1)
                     input_image = input_image * (1.0/255)
                     inputs.append(input_image)
 

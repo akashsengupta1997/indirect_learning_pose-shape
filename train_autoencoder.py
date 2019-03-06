@@ -321,88 +321,88 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
 
         renderer = SMPLRenderer()
         if trial % 50 == 0:
-            #
-            # inputs = []
-            # for fname in sorted(os.listdir(monitor_dir)):
-            #     if fname.endswith(".png"):
-            #         input_labels = cv2.imread(os.path.join(monitor_dir, fname), 0)
-            #         input_labels = cv2.resize(input_labels, (input_wh, input_wh),
-            #                                   interpolation=cv2.INTER_NEAREST)
-            #         input_labels = np.expand_dims(input_labels, axis=-1)
-            #         input_labels = input_labels * (1.0/(num_classes-1))
-            #         inputs.append(input_labels)
-            #
-            # input_mask_array = np.array(inputs)
-            # input_mask_array = input_mask_array[:batch_size, :, :, :]
-            #
-            # smpls = smpl_model.predict(input_mask_array)
-            # verts = verts_model.predict(input_mask_array)
-            # projects = projects_model.predict(input_mask_array)
-            # segs = np.reshape(segs_model.predict(input_mask_array),
-            #                   [-1, output_wh, output_wh, num_classes])
-            # seg_maps = np.argmax(segs, axis=-1)
-            #
-            # print(smpls[0])
-            # i = 0
-            # while i < batch_size:
-            #     plt.figure(1)
-            #     plt.clf()
-            #     plt.imshow(seg_maps[i])
-            #     plt.savefig("./monitor_train/seg_" + str(trial) + "_" + str(i) + ".png")
-            #     plt.figure(2)
-            #     plt.clf()
-            #     plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
-            #     plt.gca().set_aspect('equal', adjustable='box')
-            #     plt.savefig("./monitor_train/verts_" + str(trial) + "_" + str(i) + ".png")
-            #     plt.figure(3)
-            #     rend_img = renderer(verts=verts[i], render_seg=False)
-            #     plt.imshow(rend_img)
-            #     plt.savefig("./monitor_train/rend_" + str(trial) + "_" + str(i) + ".png")
-            #
-            #     if trial == 0:
-            #         plt.figure(4)
-            #         plt.clf()
-            #         plt.imshow(input_mask_array[i, :, :, 0])
-            #         plt.savefig("./monitor_train/gt_seg_" + str(i) + ".png")
-            #     i += 1
 
-            # TODO remove this testing code
-            test_input_labels, test_output_labels = generate_data(input_mask_generator,
-                                                                  output_mask_generator,
-                                                                  2,
-                                                                  num_classes)
+            inputs = []
+            for fname in sorted(os.listdir(monitor_dir)):
+                if fname.endswith(".png"):
+                    input_labels = cv2.imread(os.path.join(monitor_dir, fname), 0)
+                    input_labels = cv2.resize(input_labels, (input_wh, input_wh),
+                                              interpolation=cv2.INTER_NEAREST)
+                    input_labels = np.expand_dims(input_labels, axis=-1)
+                    input_labels = input_labels * (1.0/(num_classes-1))
+                    inputs.append(input_labels)
 
-            print(smpl_model.predict(test_input_labels)[0])
-            test_verts = verts_model.predict(test_input_labels)
-            test_projects = projects_model.predict(test_input_labels)
-            test_seg = np.reshape(segs_model.predict(test_input_labels),
-                                  (-1, output_wh, output_wh, num_classes))
-            test_seg_maps = np.argmax(test_seg, axis=-1)
-            test_gt_seg_maps = np.argmax(np.reshape(test_output_labels,
-                                                   (-1, output_wh, output_wh,
-                                                    num_classes)), axis=-1)
+            input_mask_array = np.array(inputs)
+            input_mask_array = input_mask_array[:batch_size, :, :, :]
 
-            for i in range(batch_size):
-                rend_img_keras_model = renderer(verts=test_verts[i], render_seg=False)
+            smpls = smpl_model.predict(input_mask_array)
+            verts = verts_model.predict(input_mask_array)
+            projects = projects_model.predict(input_mask_array)
+            segs = np.reshape(segs_model.predict(input_mask_array),
+                              [-1, output_wh, output_wh, num_classes])
+            seg_maps = np.argmax(segs, axis=-1)
+
+            print(smpls[0])
+            i = 0
+            while i < batch_size:
                 plt.figure(1)
                 plt.clf()
-                plt.imshow(rend_img_keras_model)
-                plt.savefig("./test_outputs/rend_" + str(trial) + "_" + str(i) + ".png")
+                plt.imshow(seg_maps[i])
+                plt.savefig("./monitor_train/seg_" + str(trial) + "_" + str(i) + ".png")
                 plt.figure(2)
                 plt.clf()
-                plt.scatter(test_projects[i, :, 0], test_projects[i, :, 1], s=1)
+                plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
                 plt.gca().set_aspect('equal', adjustable='box')
-                plt.savefig("./test_outputs/verts_" + str(trial) + "_" + str(i) + ".png")
+                plt.savefig("./monitor_train/verts_" + str(trial) + "_" + str(i) + ".png")
                 plt.figure(3)
-                plt.clf()
-                plt.imshow(test_seg_maps[i])
-                plt.savefig("./test_outputs/seg_" + str(trial) + "_" + str(i) + ".png")
+                rend_img = renderer(verts=verts[i], render_seg=False)
+                plt.imshow(rend_img)
+                plt.savefig("./monitor_train/rend_" + str(trial) + "_" + str(i) + ".png")
 
                 if trial == 0:
-                    plt.figure(5)
+                    plt.figure(4)
                     plt.clf()
-                    plt.imshow(test_gt_seg_maps[i])
-                    plt.savefig("./test_outputs/gt_seg" + "_" + str(i) + ".png")
+                    plt.imshow(input_mask_array[i, :, :, 0])
+                    plt.savefig("./monitor_train/gt_seg_" + str(i) + ".png")
+                i += 1
+
+            # # TODO remove this testing code
+            # test_input_labels, test_output_labels = generate_data(input_mask_generator,
+            #                                                       output_mask_generator,
+            #                                                       2,
+            #                                                       num_classes)
+            #
+            # print(smpl_model.predict(test_input_labels)[0])
+            # test_verts = verts_model.predict(test_input_labels)
+            # test_projects = projects_model.predict(test_input_labels)
+            # test_seg = np.reshape(segs_model.predict(test_input_labels),
+            #                       (-1, output_wh, output_wh, num_classes))
+            # test_seg_maps = np.argmax(test_seg, axis=-1)
+            # test_gt_seg_maps = np.argmax(np.reshape(test_output_labels,
+            #                                        (-1, output_wh, output_wh,
+            #                                         num_classes)), axis=-1)
+            #
+            # for i in range(batch_size):
+            #     rend_img_keras_model = renderer(verts=test_verts[i], render_seg=False)
+            #     plt.figure(1)
+            #     plt.clf()
+            #     plt.imshow(rend_img_keras_model)
+            #     plt.savefig("./test_outputs/rend_" + str(trial) + "_" + str(i) + ".png")
+            #     plt.figure(2)
+            #     plt.clf()
+            #     plt.scatter(test_projects[i, :, 0], test_projects[i, :, 1], s=1)
+            #     plt.gca().set_aspect('equal', adjustable='box')
+            #     plt.savefig("./test_outputs/verts_" + str(trial) + "_" + str(i) + ".png")
+            #     plt.figure(3)
+            #     plt.clf()
+            #     plt.imshow(test_seg_maps[i])
+            #     plt.savefig("./test_outputs/seg_" + str(trial) + "_" + str(i) + ".png")
+            #
+            #     if trial == 0:
+            #         plt.figure(5)
+            #         plt.clf()
+            #         plt.imshow(test_gt_seg_maps[i])
+            #         plt.savefig("./test_outputs/gt_seg" + "_" + str(i) + ".png")
 
 
         # if trial % 100 == 0:
