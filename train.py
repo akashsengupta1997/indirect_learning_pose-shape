@@ -303,86 +303,86 @@ def train(input_wh, output_wh, dataset):
         renderer = SMPLRenderer()
 
         if trial % 50 == 0:
-            inputs = []
-            for fname in sorted(os.listdir(monitor_dir)):
-                if fname.endswith(".png"):
-                    input_image = cv2.imread(os.path.join(monitor_dir, fname), 1)
-                    input_image = cv2.resize(input_image,
-                                             (input_wh, input_wh),
-                                             interpolation=cv2.INTER_NEAREST)
-                    input_image = input_image[..., ::-1]
-                    input_image = input_image * (1.0/255)
-                    inputs.append(input_image)
-
-            input_images_array = np.array(inputs)
-            input_images_array = input_images_array[:batch_size, :, :, :]
-
-            smpls = smpl_model.predict(input_images_array)
-            verts = verts_model.predict(input_images_array)
-            projects = projects_model.predict(input_images_array)
-            segs = np.reshape(segs_model.predict(input_images_array),
-                              [-1, output_wh, output_wh, num_classes])
-            seg_maps = np.argmax(segs, axis=-1)
-
-            print(smpls[0])
-            i = 0
-            while i < batch_size:
-                plt.figure(1)
-                plt.clf()
-                plt.imshow(seg_maps[i])
-                plt.savefig("./full_network_monitor_train/seg_" + str(trial) + "_" + str(i) + ".png")
-                plt.figure(2)
-                plt.clf()
-                plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
-                plt.gca().set_aspect('equal', adjustable='box')
-                plt.savefig("./full_network_monitor_train/verts_" + str(trial) + "_" + str(i) + ".png")
-                plt.figure(3)
-                rend_img = renderer(verts=verts[i], render_seg=False)
-                plt.imshow(rend_img)
-                plt.savefig("./full_network_monitor_train/rend_" + str(trial) + "_" + str(i) + ".png")
-
-                if trial == 0:
-                    plt.figure(4)
-                    plt.clf()
-                    plt.imshow(input_images_array[i, :, :, 0])
-                    plt.savefig("./full_network_monitor_train/image_" + str(i) + ".png")
-                i += 1
+            # inputs = []
+            # for fname in sorted(os.listdir(monitor_dir)):
+            #     if fname.endswith(".png"):
+            #         input_image = cv2.imread(os.path.join(monitor_dir, fname), 1)
+            #         input_image = cv2.resize(input_image,
+            #                                  (input_wh, input_wh),
+            #                                  interpolation=cv2.INTER_NEAREST)
+            #         input_image = input_image[..., ::-1]
+            #         input_image = input_image * (1.0/255)
+            #         inputs.append(input_image)
             #
-            # # TODO remove this testing code
-            # test_data, test_gt = generate_data(train_image_generator,
-            #                                    train_mask_generator,
-            #                                    batch_size,
-            #                                    num_classes)
-            # print(smpl_model.predict(test_data))
-            # test_verts = verts_model.predict(test_data)
-            # test_projects = projects_model.predict(test_data)
-            # test_seg = np.reshape(segs_model.predict(test_data),
-            #                       (-1, output_wh, output_wh, num_classes))
-            # test_seg_map = np.argmax(test_seg[0], axis=-1)
-            # test_gt_seg_map = np.argmax(np.reshape(test_gt[0],
-            #                                        (output_wh, output_wh,
-            #                                         num_classes)), axis=-1)
-            # renderer = SMPLRenderer()
-            # rend_img_keras_model = renderer(verts=test_verts[0], render_seg=False)
-            # plt.figure(1)
-            # plt.clf()
-            # plt.imshow(rend_img_keras_model)
-            # plt.savefig("./test_outputs/rend_" + str(trial) + ".png")
-            # plt.figure(2)
-            # plt.clf()
-            # plt.scatter(test_projects[0, :, 0], test_projects[0, :, 1], s=1)
-            # plt.gca().set_aspect('equal', adjustable='box')
-            # plt.savefig("./test_outputs/verts_" + str(trial) + ".png")
-            # plt.figure(3)
-            # plt.clf()
-            # plt.imshow(test_seg_map)
-            # plt.savefig("./test_outputs/seg_" + str(trial) + ".png")
+            # input_images_array = np.array(inputs)
+            # input_images_array = input_images_array[:batch_size, :, :, :]
             #
-            # if trial == 0:
-            #     plt.figure(5)
+            # smpls = smpl_model.predict(input_images_array)
+            # verts = verts_model.predict(input_images_array)
+            # projects = projects_model.predict(input_images_array)
+            # segs = np.reshape(segs_model.predict(input_images_array),
+            #                   [-1, output_wh, output_wh, num_classes])
+            # seg_maps = np.argmax(segs, axis=-1)
+            #
+            # print(smpls[0])
+            # i = 0
+            # while i < batch_size:
+            #     plt.figure(1)
             #     plt.clf()
-            #     plt.imshow(test_gt_seg_map)
-            #     plt.savefig("./test_outputs/gt_seg.png")
+            #     plt.imshow(seg_maps[i])
+            #     plt.savefig("./full_network_monitor_train/seg_" + str(trial) + "_" + str(i) + ".png")
+            #     plt.figure(2)
+            #     plt.clf()
+            #     plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
+            #     plt.gca().set_aspect('equal', adjustable='box')
+            #     plt.savefig("./full_network_monitor_train/verts_" + str(trial) + "_" + str(i) + ".png")
+            #     plt.figure(3)
+            #     rend_img = renderer(verts=verts[i], render_seg=False)
+            #     plt.imshow(rend_img)
+            #     plt.savefig("./full_network_monitor_train/rend_" + str(trial) + "_" + str(i) + ".png")
+            #
+            #     if trial == 0:
+            #         plt.figure(4)
+            #         plt.clf()
+            #         plt.imshow(input_images_array[i, :, :, :])
+            #         plt.savefig("./full_network_monitor_train/image_" + str(i) + ".png")
+            #     i += 1
+
+            # TODO remove this testing code
+            test_data, test_gt = generate_data(train_image_generator,
+                                               train_mask_generator,
+                                               batch_size,
+                                               num_classes)
+            print(smpl_model.predict(test_data))
+            test_verts = verts_model.predict(test_data)
+            test_projects = projects_model.predict(test_data)
+            test_seg = np.reshape(segs_model.predict(test_data),
+                                  (-1, output_wh, output_wh, num_classes))
+            test_seg_map = np.argmax(test_seg[0], axis=-1)
+            test_gt_seg_map = np.argmax(np.reshape(test_gt[0],
+                                                   (output_wh, output_wh,
+                                                    num_classes)), axis=-1)
+            renderer = SMPLRenderer()
+            rend_img_keras_model = renderer(verts=test_verts[0], render_seg=False)
+            plt.figure(1)
+            plt.clf()
+            plt.imshow(rend_img_keras_model)
+            plt.savefig("./test_outputs/rend_" + str(trial) + ".png")
+            plt.figure(2)
+            plt.clf()
+            plt.scatter(test_projects[0, :, 0], test_projects[0, :, 1], s=1)
+            plt.gca().set_aspect('equal', adjustable='box')
+            plt.savefig("./test_outputs/verts_" + str(trial) + ".png")
+            plt.figure(3)
+            plt.clf()
+            plt.imshow(test_seg_map)
+            plt.savefig("./test_outputs/seg_" + str(trial) + ".png")
+
+            if trial == 0:
+                plt.figure(5)
+                plt.clf()
+                plt.imshow(test_gt_seg_map)
+                plt.savefig("./test_outputs/gt_seg.png")
 
         # if trial % 100 == 0:
         #     segs_model.save('test_models/ups31_'
