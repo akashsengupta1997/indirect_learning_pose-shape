@@ -358,31 +358,32 @@ def train(input_wh, output_wh, dataset):
             test_projects = projects_model.predict(test_data)
             test_seg = np.reshape(segs_model.predict(test_data),
                                   (-1, output_wh, output_wh, num_classes))
-            test_seg_map = np.argmax(test_seg[0], axis=-1)
-            test_gt_seg_map = np.argmax(np.reshape(test_gt[0],
-                                                   (output_wh, output_wh,
+            test_seg_maps = np.argmax(test_seg, axis=-1)
+            test_gt_seg_maps = np.argmax(np.reshape(test_gt,
+                                                   (-1, output_wh, output_wh,
                                                     num_classes)), axis=-1)
-            renderer = SMPLRenderer()
-            rend_img_keras_model = renderer(verts=test_verts[0], render_seg=False)
-            plt.figure(1)
-            plt.clf()
-            plt.imshow(rend_img_keras_model)
-            plt.savefig("./test_outputs/rend_" + str(trial) + ".png")
-            plt.figure(2)
-            plt.clf()
-            plt.scatter(test_projects[0, :, 0], test_projects[0, :, 1], s=1)
-            plt.gca().set_aspect('equal', adjustable='box')
-            plt.savefig("./test_outputs/verts_" + str(trial) + ".png")
-            plt.figure(3)
-            plt.clf()
-            plt.imshow(test_seg_map)
-            plt.savefig("./test_outputs/seg_" + str(trial) + ".png")
 
-            if trial == 0:
-                plt.figure(5)
+            for i in range(batch_size):
+                rend_img_keras_model = renderer(verts=test_verts[i], render_seg=False)
+                plt.figure(1)
                 plt.clf()
-                plt.imshow(test_gt_seg_map)
-                plt.savefig("./test_outputs/gt_seg.png")
+                plt.imshow(rend_img_keras_model)
+                plt.savefig("./test_outputs/rend_" + str(trial) + "_" + str(i) + ".png")
+                plt.figure(2)
+                plt.clf()
+                plt.scatter(test_projects[i, :, 0], test_projects[i, :, 1], s=1)
+                plt.gca().set_aspect('equal', adjustable='box')
+                plt.savefig("./test_outputs/verts_" + str(trial) + "_" + str(i) + ".png")
+                plt.figure(3)
+                plt.clf()
+                plt.imshow(test_seg_maps[i])
+                plt.savefig("./test_outputs/seg_" + str(trial) + "_" + str(i) + ".png")
+
+                if trial == 0:
+                    plt.figure(5)
+                    plt.clf()
+                    plt.imshow(test_gt_seg_maps[i])
+                    plt.savefig("./test_outputs/gt_seg" + "_" + str(i) + ".png")
 
         # if trial % 100 == 0:
         #     segs_model.save('test_models/ups31_'
