@@ -28,7 +28,7 @@ from focal_loss import categorical_focal_loss
 
 
 def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes,
-                      encoder_architecture='resnet50', use_IEF=False):
+                      encoder_architecture='resnet50', use_IEF=False, vertex_sampling=2):
     num_camera_params = 4
     num_smpl_params = 72 + 10
     num_total_params = num_smpl_params + num_camera_params
@@ -92,7 +92,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         delta1 = IEF_layer_1(state1)
         delta1 = IEF_layer_2(delta1)
         delta1 = IEF_layer_3(delta1)
-        delta1 = Lambda(lambda x: x * 0.03)(delta1)
+        delta1 = Lambda(lambda x: x * 0.002)(delta1)
         param2 = Add()([param1, delta1])
         state2 = Concatenate()([img_features, param2])
 
@@ -100,7 +100,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         delta2 = IEF_layer_1(state2)
         delta2 = IEF_layer_2(delta2)
         delta2 = IEF_layer_3(delta2)
-        delta2 = Lambda(lambda x: x * 0.03)(delta2)
+        delta2 = Lambda(lambda x: x * 0.002)(delta2)
         param3 = Add()([param2, delta2])
         state3 = Concatenate()([img_features, param3])
 
@@ -108,7 +108,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         delta3 = IEF_layer_1(state3)
         delta3 = IEF_layer_2(delta3)
         delta3 = IEF_layer_3(delta3)
-        delta3 = Lambda(lambda x: x * 0.03)(delta3)
+        delta3 = Lambda(lambda x: x * 0.002)(delta3)
         final_param = Add()([param3, delta3])
 
     else:
@@ -124,10 +124,13 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
     # custom objects as just saving the encoder
 
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
-    projects_with_depth = Lambda(orthographic_project2, name='project')([verts, final_param])
+    projects_with_depth = Lambda(orthographic_project2,
+                                 arguments={'vertex_sampling': vertex_sampling},
+                                 name='project')([verts, final_param])
     masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
     segs = Lambda(projects_to_seg,
-                  arguments={'img_wh': output_img_wh},
+                  arguments={'img_wh': output_img_wh,
+                             'vertex_sampling': vertex_sampling},
                   name='segment')([projects_with_depth, masks])
     segs = Reshape((output_img_wh * output_img_wh, num_classes))(segs)
     segs = Activation('softmax')(segs)
@@ -412,4 +415,4 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
     print("Finished")
 
 
-train(256, 96, 'up-s31')
+train(256, 80, 'up-s31')
