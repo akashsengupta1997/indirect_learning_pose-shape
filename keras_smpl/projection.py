@@ -4,6 +4,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from keras import backend as K
 
 
 def persepective_project(verts):
@@ -80,7 +81,7 @@ def orthographic_project(verts):
     return project_coords
 
 
-def orthographic_project2(inputs):
+def orthographic_project2(inputs, vertex_sampling):
     """
 
     :param verts:
@@ -92,13 +93,18 @@ def orthographic_project2(inputs):
     u0 = smpl[:, 2]
     v0 = smpl[:, 3]
 
+    if vertex_sampling is not None:
+        verts = verts[:, ::vertex_sampling, :]
+
+    print(verts.get_shape())
+
     x_proj = verts[:, :, 0]
     y_proj = verts[:, :, 1]
     z = verts[:, :, 2]
-    k_u = tf.tile(tf.expand_dims(k_u, axis=1), [1, 6890])
-    k_v = tf.tile(tf.expand_dims(k_v, axis=1), [1, 6890])
-    u0 = tf.tile(tf.expand_dims(u0, axis=1), [1, 6890])
-    v0 = tf.tile(tf.expand_dims(v0, axis=1), [1, 6890])
+    k_u = tf.tile(tf.expand_dims(k_u, axis=1), [1, K.shape(verts)[1]])
+    k_v = tf.tile(tf.expand_dims(k_v, axis=1), [1, K.shape(verts)[1]])
+    u0 = tf.tile(tf.expand_dims(u0, axis=1), [1, K.shape(verts)[1]])
+    v0 = tf.tile(tf.expand_dims(v0, axis=1), [1, K.shape(verts)[1]])
     u = tf.add(u0, tf.multiply(x_proj, k_u))
     v = tf.add(v0, tf.multiply(y_proj, k_v))
     project_coords_with_depth = tf.stack([u, v, z], axis=2)

@@ -10,7 +10,7 @@ import pickle
 from keras import backend as K
 
 
-def projects_to_seg(input, img_wh):
+def projects_to_seg(input, img_wh, vertex_sampling):
     """
 
     :param projects:
@@ -19,7 +19,10 @@ def projects_to_seg(input, img_wh):
     projects_with_depth, mask_vals = input
     projects = projects_with_depth[:, :, :2]
 
-    part_indices_path = "./keras_smpl/part_vertices.pkl"
+    if vertex_sampling is None:
+        part_indices_path = "./keras_smpl/part_vertices.pkl"
+    else:
+        part_indices_path = "./keras_smpl/" + str(vertex_sampling) + "_sampled_part_vertices.pkl"
 
     with open(part_indices_path, 'rb') as f:
         part_indices = pickle.load(f)
@@ -34,6 +37,8 @@ def projects_to_seg(input, img_wh):
     segs = []
     for part in range(len(part_indices)):
         indices = part_indices[part]
+        if vertex_sampling is not None:
+            indices = [index//vertex_sampling for index in indices]
         num_indices = len(indices)
         indices = tf.constant(indices, dtype='int32')
 

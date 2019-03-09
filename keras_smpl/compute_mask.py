@@ -38,8 +38,9 @@ def compute_mask_map_over_batch(pixels_with_depth):
     :param pixels_with_depth: 6890 x 3
     :return:
     """
-    img_wh = 96
-    indices = tf.expand_dims(tf.range(6890, dtype='float32'), axis=1)
+    img_wh = 80
+    num_pixels = pixels_with_depth.get_shape().as_list()[0]
+    indices = tf.expand_dims(tf.range(num_pixels, dtype='float32'), axis=1)
     pixels_with_depth_and_index = tf.concat([pixels_with_depth, indices], axis=1)  # 6890 x 4
 
     i = tf.range(0, img_wh)
@@ -57,7 +58,7 @@ def compute_mask_map_over_batch(pixels_with_depth):
                             dtype='int32')
     min_indices, _ = tf.unique(tf.squeeze(min_indices))
 
-    mask = K.variable(np.ones((6890))*500)
+    mask = K.variable(np.ones(num_pixels) * 500)
     ones = tf.ones_like(min_indices, dtype='float32')
     mask = tf.scatter_update(mask, min_indices, ones)
 
@@ -66,7 +67,8 @@ def compute_mask_map_over_batch(pixels_with_depth):
 
 def get_min_depth_vert_index_at_pixel(input):
     pixel_coord, pixels_with_depth_and_index = input
-    pixel_coord = tf.tile(tf.expand_dims(pixel_coord, axis=0), [6890, 1])  # 6890 x 2
+    num_pixels = pixels_with_depth_and_index.get_shape().as_list()[0]
+    pixel_coord = tf.tile(tf.expand_dims(pixel_coord, axis=0), [num_pixels, 1])  # 6890 x 2
 
     vert_indices_at_pixel = tf.where(tf.reduce_all(tf.equal(pixel_coord,
                                                             pixels_with_depth_and_index[:, :2]),
