@@ -291,7 +291,7 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
             num_classes)
 
         segs_model.compile(optimizer=adam_optimiser,
-                           loss=categorical_focal_loss(gamma=5.0),
+                           loss=categorical_focal_loss(gamma=5.0, weight_classes=True),
                            metrics=['accuracy'])
 
     print("Model compiled.")
