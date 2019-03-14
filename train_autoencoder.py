@@ -27,8 +27,9 @@ from renderer import SMPLRenderer
 from focal_loss import categorical_focal_loss
 
 
-def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes,
-                      encoder_architecture='resnet50', use_IEF=False, vertex_sampling=2):
+def build_autoencoder(train_batch_size, input_shape, smpl_path, output_wh, num_classes,
+                      encoder_architecture='resnet50', use_IEF=False, vertex_sampling=None,
+                      scaledown=0.005):
     num_camera_params = 4
     num_smpl_params = 72 + 10
     num_total_params = num_smpl_params + num_camera_params
@@ -86,13 +87,14 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         IEF_layer_3 = Dense(num_total_params, activation='linear', name='IEF_layer_3')
 
         # Load mean params and set initial state to concatenation of image features and mean params
-        state1, param1 = Lambda(concat_mean_param)(img_features)
+        state1, param1 = Lambda(concat_mean_param,
+                                arguments={'img_wh': output_wh})(img_features)
 
         # Iteration 1
         delta1 = IEF_layer_1(state1)
         delta1 = IEF_layer_2(delta1)
         delta1 = IEF_layer_3(delta1)
-        delta1 = Lambda(lambda x: x * 0.002)(delta1)
+        delta1 = Lambda(lambda x, d: x * d, arguments={"d": scaledown})(delta1)
         param2 = Add()([param1, delta1])
         state2 = Concatenate()([img_features, param2])
 
@@ -100,7 +102,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         delta2 = IEF_layer_1(state2)
         delta2 = IEF_layer_2(delta2)
         delta2 = IEF_layer_3(delta2)
-        delta2 = Lambda(lambda x: x * 0.002)(delta2)
+        delta2 = Lambda(lambda x, d: x * d, arguments={"d": scaledown})(delta2)
         param3 = Add()([param2, delta2])
         state3 = Concatenate()([img_features, param3])
 
@@ -108,20 +110,16 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
         delta3 = IEF_layer_1(state3)
         delta3 = IEF_layer_2(delta3)
         delta3 = IEF_layer_3(delta3)
-        delta3 = Lambda(lambda x: x * 0.002)(delta3)
+        delta3 = Lambda(lambda x, d: x * d, arguments={"d": scaledown})(delta3)
         final_param = Add()([param3, delta3])
 
     else:
         smpl = Dense(2048, activation='relu')(img_features)
         smpl = Dense(1024, activation='relu')(smpl)
         smpl = Dense(num_total_params, activation='linear')(smpl)
-        smpl = Lambda(lambda x: x * 0.01, name="scale_down")(smpl)
+        smpl = Lambda(lambda x: x * scaledown, name="scale_down")(smpl)
         final_param = Lambda(load_mean_set_cam_params,
-                             arguments={'img_wh': output_img_wh})(smpl)
-
-    # TODO add another model (model_to_save) that has smpl as output, this will be the model
-    # that is saved during training and used during predictions - don't need to worry about
-    # custom objects as just saving the encoder
+                             arguments={'img_wh': output_wh})(smpl)
 
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
     projects_with_depth = Lambda(orthographic_project2,
@@ -129,10 +127,10 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_img_wh, n
                                  name='project')([verts, final_param])
     masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
     segs = Lambda(projects_to_seg,
-                  arguments={'img_wh': output_img_wh,
+                  arguments={'img_wh': output_wh,
                              'vertex_sampling': vertex_sampling},
                   name='segment')([projects_with_depth, masks])
-    segs = Reshape((output_img_wh * output_img_wh, num_classes))(segs)
+    segs = Reshape((output_wh * output_wh, num_classes))(segs)
     segs = Activation('softmax')(segs)
 
     segs_model = Model(inputs=inp, outputs=segs)
@@ -188,18 +186,19 @@ def generate_data(input_mask_generator, output_mask_generator, n, num_classes):
     return np.array(input_labels), np.array(output_seg_labels)
 
 
-def train(input_wh, output_wh, dataset, multi_gpu=False):
-    batch_size = 3
+def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_sampling=None,
+          scaledown=0.005, weight_classes=False, save_model=False):
+    batch_size = 2
 
     if dataset == 'up-s31':
-        train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks2"
+        train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
         # train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded/masks"
         # val_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
         monitor_dir = "./monitor_train/monitor_train_images"
         # TODO create validation directory
         num_classes = 32
         # num_train_images = 6813
-        num_train_images = 31
+        num_train_images = 2
 
     assert os.path.isdir(train_dir), 'Invalid train directory'
     # assert os.path.isdir(val_dir), 'Invalid validation directory'
@@ -288,10 +287,14 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
             (input_wh, input_wh, 1),
             "./neutral_smpl_with_cocoplus_reg.pkl",
             output_wh,
-            num_classes)
+            num_classes,
+            use_IEF=use_IEF,
+            vertex_sampling=vertex_sampling,
+            scaledown=scaledown)
 
         segs_model.compile(optimizer=adam_optimiser,
-                           loss=categorical_focal_loss(gamma=5.0, weight_classes=True),
+                           loss=categorical_focal_loss(gamma=5.0,
+                                                       weight_classes=weight_classes),
                            metrics=['accuracy'])
 
     print("Model compiled.")
@@ -369,50 +372,21 @@ def train(input_wh, output_wh, dataset, multi_gpu=False):
                     plt.savefig("./monitor_train/gt_seg_" + str(i) + ".png")
                 i += 1
 
-            # # TODO remove this testing code
-            # test_input_labels, test_output_labels = generate_data(input_mask_generator,
-            #                                                       output_mask_generator,
-            #                                                       2,
-            #                                                       num_classes)
-            #
-            # print(smpl_model.predict(test_input_labels)[0])
-            # test_verts = verts_model.predict(test_input_labels)
-            # test_projects = projects_model.predict(test_input_labels)
-            # test_seg = np.reshape(segs_model.predict(test_input_labels),
-            #                       (-1, output_wh, output_wh, num_classes))
-            # test_seg_maps = np.argmax(test_seg, axis=-1)
-            # test_gt_seg_maps = np.argmax(np.reshape(test_output_labels,
-            #                                        (-1, output_wh, output_wh,
-            #                                         num_classes)), axis=-1)
-            #
-            # for i in range(batch_size):
-            #     rend_img_keras_model = renderer(verts=test_verts[i], render_seg=False)
-            #     plt.figure(1)
-            #     plt.clf()
-            #     plt.imshow(rend_img_keras_model)
-            #     plt.savefig("./test_outputs/rend_" + str(trial) + "_" + str(i) + ".png")
-            #     plt.figure(2)
-            #     plt.clf()
-            #     plt.scatter(test_projects[i, :, 0], test_projects[i, :, 1], s=1)
-            #     plt.gca().set_aspect('equal', adjustable='box')
-            #     plt.savefig("./test_outputs/verts_" + str(trial) + "_" + str(i) + ".png")
-            #     plt.figure(3)
-            #     plt.clf()
-            #     plt.imshow(test_seg_maps[i])
-            #     plt.savefig("./test_outputs/seg_" + str(trial) + "_" + str(i) + ".png")
-            #
-            #     if trial == 0:
-            #         plt.figure(5)
-            #         plt.clf()
-            #         plt.imshow(test_gt_seg_maps[i])
-            #         plt.savefig("./test_outputs/gt_seg" + "_" + str(i) + ".png")
+            if save_model:
+                save_fname = "{dataset}_{output_wh}x{output_wh}_resnet".format(dataset=dataset,
+                                                                               output_wh=output_wh)
+                if use_IEF:
+                    save_fname += "_ief"
+                save_fname += "_scaledown{scaledown}".format(
+                    scaledown=str(scaledown).replace('.', ''))
+                if vertex_sampling is not None:
+                    save_fname += "_vs{vertex_sampling}".format(vertex_sampling=vertex_sampling)
+                if weight_classes:
+                    save_fname += "_weighted"
+                save_fname += "_{trial}.hdf5".format(trial=trial)
+                smpl_model.save(os.path.join('./test_models', save_fname))
+                print('SAVE NAME', save_fname)
 
 
-        # if trial % 100 == 0:
-        #     segs_model.save('test_models/ups31_'
-        #                      + str(nb_epoch * (trial + 1)).zfill(4) + '.hdf5')
-
-    print("Finished")
-
-
-train(256, 80, 'up-s31')
+train(256, 96, 'up-s31', use_IEF=True, vertex_sampling=None, scaledown=0.005,
+      weight_classes=True, save_model=True)

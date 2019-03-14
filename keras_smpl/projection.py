@@ -96,8 +96,6 @@ def orthographic_project2(inputs, vertex_sampling):
     if vertex_sampling is not None:
         verts = verts[:, ::vertex_sampling, :]
 
-    print(verts.get_shape())
-
     x_proj = verts[:, :, 0]
     y_proj = verts[:, :, 1]
     z = verts[:, :, 2]

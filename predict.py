@@ -2,78 +2,105 @@ import os
 
 from matplotlib import pyplot as plt
 import numpy as np
+import deepdish as dd
 import cv2
 import pickle
 
 import tensorflow as tf
-from keras.models import load_model
+from keras.models import Model, load_model
+from keras.layers import Lambda
+
 from keras_smpl.batch_smpl import SMPLLayer
-from keras_smpl.projection import persepective_project
+from keras_smpl.projection import orthographic_project2
+from keras_smpl.compute_mask import compute_mask
 from keras_smpl.projects_to_seg import projects_to_seg
 
+from renderer import SMPLRenderer
 
-def test(model, img_wh, img_dec_wh, image_dir, num_classes, save=False):
-    img_list = []
+
+def create_input_tensor(image_dir, input_wh, num_classes):
+    inputs = []
     fnames = []
     for fname in sorted(os.listdir(image_dir)):
-        if fname.endswith(".png") or fname.endswith(".jpg"):
+        if fname.endswith(".png"):
             print(fname)
-            image = cv2.imread(os.path.join(image_dir, fname))
-            image = cv2.resize(image, (img_wh, img_wh))
-            image = image[..., ::-1]
-            # plt.imshow(image)
-            # plt.show()
-            img_list.append(image / 255.0)
-            fnames.append(fname)
+            input_seg = cv2.imread(os.path.join(image_dir, fname), 0)
+            input_seg = cv2.resize(input_seg, (input_wh, input_wh),
+                                   interpolation=cv2.INTER_NEAREST)
+            input_seg = np.expand_dims(input_seg, axis=-1)
+            input_seg = input_seg * (1.0 / (num_classes - 1))
+            inputs.append(input_seg)
+            fnames.append(os.path.splitext(fname)[0])
 
-    img_tensor = np.array(img_list)
-    output = np.reshape(model.predict(img_tensor), (len(img_list), img_dec_wh, img_dec_wh,
-                                                    num_classes))
-    print("orig output shape", output.shape)
-    for img_num in range(len(img_list)):
-        seg_labels = output[img_num, :, :, :]
-        seg_img = np.argmax(seg_labels, axis=2)
-        # print("labels output shape", seg_labels.shape)
-        # print("seg img output shape", seg_img.shape)
-        if not save:
-            plt.figure(1)
-            plt.clf()
-            plt.subplot(331)
-            plt.imshow(seg_labels[:, :, 0], cmap="gray")
-            plt.subplot(332)
-            plt.imshow(seg_labels[:, :, 1], cmap="gray")
-            plt.subplot(333)
-            plt.imshow(seg_labels[:, :, 2], cmap="gray")
-            plt.subplot(334)
-            plt.imshow(seg_labels[:, :, 3], cmap="gray")
-            plt.subplot(335)
-            plt.imshow(seg_labels[:, :, 4], cmap="gray")
-            plt.subplot(336)
-            plt.imshow(seg_labels[:, :, 5], cmap="gray")
-            plt.subplot(337)
-            plt.imshow(seg_labels[:, :, 6], cmap="gray")
-            plt.figure(2)
-            plt.clf()
-            plt.imshow(seg_img)
-            plt.figure(3)
-            plt.clf()
-            plt.imshow(img_list[img_num])
-            plt.show()
-        else:
-            save_path = os.path.join(image_dir, "results64_pppups31", os.path.splitext(fnames[img_num])[0]
-                                     + "_seg_img.png")
-            plt.imsave(save_path, seg_img*8)
+    input_tensor = np.array(inputs)
+    print('Input shape:', input_tensor.shape)
+
+    return input_tensor, fnames
 
 
-def segmentation_test(img_wh, img_dec_wh, num_classes, save=False):
-    test_image_dir = '/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/images/train'
-    print('Preloaded model')
-    model = load_model('./test_models/ups31_0101.hdf5',
-                       custom_objects={'SMPLLayer': SMPLLayer,
-                                       'tf': tf,
-                                       'pickle': pickle})
-    test(model, img_wh, img_dec_wh, test_image_dir, num_classes, save=save)
+def build_full_model(smpl_model, output_wh, smpl_path, batch_size):
+    inp = smpl_model.input
+    smpl = smpl_model.output
+    verts = SMPLLayer(smpl_path, batch_size=batch_size)(smpl)
+    projects_with_depth = Lambda(orthographic_project2,
+                                 arguments={'vertex_sampling': None},
+                                 name='project')([verts, smpl])
+    masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
+    segs = Lambda(projects_to_seg,
+                  arguments={'img_wh': output_wh,
+                             'vertex_sampling': None},
+                  name='segment')([projects_with_depth, masks])
+
+    verts_model = Model(inputs=inp, outputs=verts)
+    projects_model = Model(inputs=inp, outputs=projects_with_depth)
+    segs_model = Model(inputs=inp, outputs=segs)
+
+    return verts_model, projects_model, segs_model
 
 
-segmentation_test(256, 64, 32, save=False)
+def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=False):
+    test_image_dir = '/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks/train'
+    input_tensor, fnames = create_input_tensor(test_image_dir, input_wh, num_classes)
+    num_inputs = input_tensor.shape[0]
 
+    smpl_model = load_model(os.path.join("./test_models", model_fname),
+                            custom_objects={'dd': dd,
+                                            'tf': tf})
+    print('Model {model_fname} loaded'.format(model_fname=model_fname))
+
+    verts_model, projects_model, segs_model = build_full_model(smpl_model,
+                                                               output_wh,
+                                                               "./neutral_smpl_with_cocoplus_reg.pkl",
+                                                               num_inputs)
+
+    smpls = smpl_model.predict(input_tensor)
+    verts = verts_model.predict(input_tensor)
+    projects = projects_model.predict(input_tensor)
+    segs = segs_model.predict(input_tensor)
+    seg_maps = np.argmax(segs, axis=-1)
+    renderer = SMPLRenderer()
+
+    for i in range(num_inputs):
+        plt.figure(1)
+        plt.clf()
+        plt.imshow(seg_maps[i])
+        if save:
+            plt.savefig(os.path.join(test_image_dir,
+                                     "{fname}_seg.png").format(fname=fnames[i]))
+        plt.figure(2)
+        plt.clf()
+        plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
+        plt.gca().set_aspect('equal', adjustable='box')
+        if save:
+            plt.savefig(os.path.join(test_image_dir,
+                                     "{fname}_projects.png").format(fname=fnames[i]))
+        plt.figure(3)
+        rend_img = renderer(verts=verts[i], render_seg=False)
+        plt.imshow(rend_img)
+        if save:
+            plt.savefig(os.path.join(test_image_dir,
+                                     "{fname}_rend.png").format(fname=fnames[i]))
+
+
+predict_autoencoder(256, 80, 32, 'up-s31_80x80_resnet_ief_scaledown0005_0.hdf5',
+                    save=True)

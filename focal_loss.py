@@ -19,16 +19,25 @@ def categorical_focal_loss(gamma=2.0, weight_classes=False):
         if weight_classes:
 
             weights = np.ones(32)
-            weights[1] = 5.0
-            weights[4] = 5.0
-            weights[10] = 2.5
-            weights[12] = 2.5
-            weights[14] = 5.0
-            weights[17] = 5.0
-            weights[23] = 2.5
-            weights[25] = 2.5
+            weights[0] = 1.0
+            weights[1] = 20.0
+            weights[2] = 20.0
+            weights[3] = 20.0
+            weights[4] = 20.0
+
+            weights[10] = 10.0
+            weights[12] = 10.0
+
+            weights[14] = 20.0
+            weights[15] = 20.0
+            weights[16] = 20.0
+            weights[17] = 20.0
+
+            weights[23] = 10.0
+            weights[25] = 10.0
             weights = tf.constant(weight_classes, dtype='float32')
             cross_entropy = tf.multiply(cross_entropy, weights)
+            print("WEIGHTED LOSS")
 
         focal_loss = K.pow(1-y_pred, gamma) * cross_entropy
         focal_loss = K.sum(focal_loss, axis=2)  # sum over classes dimension (only non zero value in sum is -log(correct class output)
