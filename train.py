@@ -25,19 +25,9 @@ from renderer import SMPLRenderer
 from focal_loss import categorical_focal_loss
 
 
-def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_classes,
-                encoder_architecture='resnet50', use_IEF=False):
-    """
-    Build indirect learning model, using backbone designated in encoder_architecture.
-    :param train_batch_size: batch size to use for training
-    :param input_shape: H x W x 3
-    :param smpl_path: path to SMPL model data
-    :param output_img_wh: width and height of output image
-    :param num_classes: number of part segmentation classes
-    :param encoder_architecture: backbone architecture
-    :return: 4 models - each takes images as inputs and outputs segmentations, smpl params,
-    vertex projections and renderings respectively.
-    """
+def build_model(train_batch_size, input_shape, smpl_path, output_wh, num_classes,
+                encoder_architecture='resnet50', use_IEF=False, vertex_sampling=None,
+                scaledown=0.005):
     num_camera_params = 4
     num_smpl_params = 72 + 10
     num_total_params = num_smpl_params + num_camera_params
@@ -61,12 +51,14 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
         IEF_layer_3 = Dense(num_total_params, activation='linear', name='IEF_layer_3')
 
         # Load mean params and set initial state to concatenation of image features and mean params
-        state1, param1 = Lambda(concat_mean_param)(img_features)
+        state1, param1 = Lambda(concat_mean_param,
+                                arguments={'img_wh': output_wh})(img_features)
 
         # Iteration 1
         delta1 = IEF_layer_1(state1)
         delta1 = IEF_layer_2(delta1)
         delta1 = IEF_layer_3(delta1)
+        delta1 = Lambda(lambda x, d: x * d, arguments={"d": scaledown})(delta1)
         param2 = Add()([param1, delta1])
         state2 = Concatenate()([img_features, param2])
 
@@ -74,6 +66,7 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
         delta2 = IEF_layer_1(state2)
         delta2 = IEF_layer_2(delta2)
         delta2 = IEF_layer_3(delta2)
+        delta2 = Lambda(lambda x, d: x * d, arguments={"d": scaledown})(delta2)
         param3 = Add()([param2, delta2])
         state3 = Concatenate()([img_features, param3])
 
@@ -81,23 +74,27 @@ def build_model(train_batch_size, input_shape, smpl_path, output_img_wh, num_cla
         delta3 = IEF_layer_1(state3)
         delta3 = IEF_layer_2(delta3)
         delta3 = IEF_layer_3(delta3)
+        delta3 = Lambda(lambda x, d: x * d, arguments={"d": scaledown})(delta3)
         final_param = Add()([param3, delta3])
 
     else:
-        smpl = Dense(1024, activation='relu')(img_features)
+        smpl = Dense(2048, activation='relu')(img_features)
         smpl = Dense(1024, activation='relu')(smpl)
         smpl = Dense(num_total_params, activation='linear')(smpl)
-        smpl = Lambda(lambda x: x * 0.01, name="scale_down")(smpl)
+        smpl = Lambda(lambda x: x * scaledown, name="scale_down")(smpl)
         final_param = Lambda(load_mean_set_cam_params,
-                             arguments={'img_wh': output_img_wh})(smpl)
+                             arguments={'img_wh': output_wh})(smpl)
 
     verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
-    projects_with_depth = Lambda(orthographic_project2, name='project')([verts, final_param])
+    projects_with_depth = Lambda(orthographic_project2,
+                                 arguments={'vertex_sampling': vertex_sampling},
+                                 name='project')([verts, final_param])
     masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
     segs = Lambda(projects_to_seg,
-                  arguments={'img_wh': output_img_wh},
+                  arguments={'img_wh': output_wh,
+                             'vertex_sampling': vertex_sampling},
                   name='segment')([projects_with_depth, masks])
-    segs = Reshape((output_img_wh * output_img_wh, num_classes))(segs)
+    segs = Reshape((output_wh * output_wh, num_classes))(segs)
     segs = Activation('softmax')(segs)
 
     segs_model = Model(inputs=inp, outputs=segs)
@@ -156,7 +153,8 @@ def generate_data(image_generator, mask_generator, n, num_classes):
     return np.array(images), np.array(labels)
 
 
-def train(input_wh, output_wh, dataset):
+def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
+          scaledown=0.005, weight_classes=False, save_model=False):
     batch_size = 3
 
     if dataset == 'up-s31':
@@ -166,8 +164,8 @@ def train(input_wh, output_wh, dataset):
         # TODO create validation directory
         num_classes = 32
         # num_train_images = 8515
-        num_train_images = 31
-        # num_train_images = 2
+        # num_train_images = 31
+        num_train_images = 3
 
     assert os.path.isdir(train_image_dir), 'Invalid image directory'
     assert os.path.isdir(train_label_dir), 'Invalid label directory'
@@ -262,11 +260,14 @@ def train(input_wh, output_wh, dataset):
         (input_wh, input_wh, 3),
         "./neutral_smpl_with_cocoplus_reg.pkl",
         output_wh,
-        num_classes)
+        num_classes,
+        use_IEF=use_IEF,
+        vertex_sampling=vertex_sampling,
+        scaledown=scaledown)
 
     adam_optimiser = Adam(lr=0.0001)
     segs_model.compile(optimizer=adam_optimiser,
-                       loss=categorical_focal_loss(gamma=5.0),
+                       loss=categorical_focal_loss(gamma=5.0, weight_classes=weight_classes),
                        metrics=['accuracy'])
 
     print("Model compiled.")
@@ -296,99 +297,76 @@ def train(input_wh, output_wh, dataset):
         #         yield (val_data, reshaped_val_labels)
 
         history = segs_model.fit_generator(train_data_gen(),
-                                            steps_per_epoch=int(num_train_images/batch_size),
-                                            nb_epoch=1,
-                                            verbose=1)
+                                           steps_per_epoch=int(num_train_images/batch_size),
+                                           nb_epoch=1,
+                                           verbose=1)
 
         renderer = SMPLRenderer()
 
         if trial % 50 == 0:
-            # inputs = []
-            # for fname in sorted(os.listdir(monitor_dir)):
-            #     if fname.endswith(".png"):
-            #         input_image = cv2.imread(os.path.join(monitor_dir, fname), 1)
-            #         input_image = cv2.resize(input_image,
-            #                                  (input_wh, input_wh),
-            #                                  interpolation=cv2.INTER_NEAREST)
-            #         input_image = input_image[..., ::-1]
-            #         input_image = input_image * (1.0/255)
-            #         inputs.append(input_image)
-            #
-            # input_images_array = np.array(inputs)
-            # input_images_array = input_images_array[:batch_size, :, :, :]
-            #
-            # smpls = smpl_model.predict(input_images_array)
-            # verts = verts_model.predict(input_images_array)
-            # projects = projects_model.predict(input_images_array)
-            # segs = np.reshape(segs_model.predict(input_images_array),
-            #                   [-1, output_wh, output_wh, num_classes])
-            # seg_maps = np.argmax(segs, axis=-1)
-            #
-            # print(smpls[0])
-            # i = 0
-            # while i < batch_size:
-            #     plt.figure(1)
-            #     plt.clf()
-            #     plt.imshow(seg_maps[i])
-            #     plt.savefig("./full_network_monitor_train/seg_" + str(trial) + "_" + str(i) + ".png")
-            #     plt.figure(2)
-            #     plt.clf()
-            #     plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
-            #     plt.gca().set_aspect('equal', adjustable='box')
-            #     plt.savefig("./full_network_monitor_train/verts_" + str(trial) + "_" + str(i) + ".png")
-            #     plt.figure(3)
-            #     rend_img = renderer(verts=verts[i], render_seg=False)
-            #     plt.imshow(rend_img)
-            #     plt.savefig("./full_network_monitor_train/rend_" + str(trial) + "_" + str(i) + ".png")
-            #
-            #     if trial == 0:
-            #         plt.figure(4)
-            #         plt.clf()
-            #         plt.imshow(input_images_array[i, :, :, :])
-            #         plt.savefig("./full_network_monitor_train/image_" + str(i) + ".png")
-            #     i += 1
+            inputs = []
+            for fname in sorted(os.listdir(monitor_dir)):
+                if fname.endswith(".png"):
+                    input_image = cv2.imread(os.path.join(monitor_dir, fname), 1)
+                    input_image = cv2.resize(input_image,
+                                             (input_wh, input_wh),
+                                             interpolation=cv2.INTER_NEAREST)
+                    input_image = input_image[..., ::-1]
+                    input_image = input_image * (1.0/255)
+                    inputs.append(input_image)
 
-            # TODO remove this testing code
-            test_data, test_gt = generate_data(train_image_generator,
-                                               train_mask_generator,
-                                               batch_size,
-                                               num_classes)
-            print(smpl_model.predict(test_data))
-            test_verts = verts_model.predict(test_data)
-            test_projects = projects_model.predict(test_data)
-            test_seg = np.reshape(segs_model.predict(test_data),
-                                  (-1, output_wh, output_wh, num_classes))
-            test_seg_maps = np.argmax(test_seg, axis=-1)
-            test_gt_seg_maps = np.argmax(np.reshape(test_gt,
-                                                   (-1, output_wh, output_wh,
-                                                    num_classes)), axis=-1)
+            input_images_array = np.array(inputs)
+            input_images_array = input_images_array[:batch_size, :, :, :]
 
-            for i in range(batch_size):
-                rend_img_keras_model = renderer(verts=test_verts[i], render_seg=False)
+            smpls = smpl_model.predict(input_images_array)
+            verts = verts_model.predict(input_images_array)
+            projects = projects_model.predict(input_images_array)
+            segs = np.reshape(segs_model.predict(input_images_array),
+                              [-1, output_wh, output_wh, num_classes])
+            seg_maps = np.argmax(segs, axis=-1)
+
+            print(smpls[0])
+            i = 0
+            while i < batch_size:
                 plt.figure(1)
                 plt.clf()
-                plt.imshow(rend_img_keras_model)
-                plt.savefig("./test_outputs/rend_" + str(trial) + "_" + str(i) + ".png")
+                plt.imshow(seg_maps[i])
+                plt.savefig("./full_network_monitor_train/seg_" + str(trial) + "_" + str(i) + ".png")
                 plt.figure(2)
                 plt.clf()
-                plt.scatter(test_projects[i, :, 0], test_projects[i, :, 1], s=1)
+                plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
                 plt.gca().set_aspect('equal', adjustable='box')
-                plt.savefig("./test_outputs/verts_" + str(trial) + "_" + str(i) + ".png")
+                plt.savefig("./full_network_monitor_train/verts_" + str(trial) + "_" + str(i) + ".png")
                 plt.figure(3)
-                plt.clf()
-                plt.imshow(test_seg_maps[i])
-                plt.savefig("./test_outputs/seg_" + str(trial) + "_" + str(i) + ".png")
+                rend_img = renderer(verts=verts[i], render_seg=False)
+                plt.imshow(rend_img)
+                plt.savefig("./full_network_monitor_train/rend_" + str(trial) + "_" + str(i) + ".png")
 
                 if trial == 0:
-                    plt.figure(5)
+                    plt.figure(4)
                     plt.clf()
-                    plt.imshow(test_gt_seg_maps[i])
-                    plt.savefig("./test_outputs/gt_seg" + "_" + str(i) + ".png")
+                    plt.imshow(input_images_array[i, :, :, :])
+                    plt.savefig("./full_network_monitor_train/image_" + str(i) + ".png")
+                i += 1
 
-        # if trial % 100 == 0:
-        #     segs_model.save('test_models/ups31_'
-        #                      + str(nb_epoch * (trial + 1)).zfill(4) + '.hdf5')
+        if save_model:
+            save_fname = "{dataset}_{output_wh}x{output_wh}_resnet".format(dataset=dataset,
+                                                                           output_wh=output_wh)
+            if use_IEF:
+                save_fname += "_ief"
+            save_fname += "_scaledown{scaledown}".format(
+                scaledown=str(scaledown).replace('.', ''))
+            if vertex_sampling is not None:
+                save_fname += "_vs{vertex_sampling}".format(vertex_sampling=vertex_sampling)
+            if weight_classes:
+                save_fname += "_weighted"
+            save_fname += "_{trial}.hdf5".format(trial=trial)
+            smpl_model.save(os.path.join('./test_models', save_fname))
+            print('SAVE NAME', save_fname)
 
     print("Finished")
 
-train(256, 96, 'up-s31')
+
+train(256, 96, 'up-s31', use_IEF=True, vertex_sampling=None, scaledown=0.005,
+      weight_classes=True, save_model=True)
+

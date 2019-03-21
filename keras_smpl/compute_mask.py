@@ -38,7 +38,7 @@ def compute_mask_map_over_batch(pixels_with_depth):
     :param pixels_with_depth: 6890 x 3
     :return:
     """
-    img_wh = 80
+    img_wh = 96
     num_pixels = pixels_with_depth.get_shape().as_list()[0]
     indices = tf.expand_dims(tf.range(num_pixels, dtype='float32'), axis=1)
     pixels_with_depth_and_index = tf.concat([pixels_with_depth, indices], axis=1)  # 6890 x 4

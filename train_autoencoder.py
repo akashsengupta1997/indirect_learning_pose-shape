@@ -38,6 +38,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_wh, num_c
     if encoder_architecture == 'enet':
         inp = Input(shape=input_shape)
         img_features = build_enet(inp)  # (N, 32, 32, 128) output size from enet
+        # TODO add layers to get to (N, 2048) size
 
     elif encoder_architecture == 'resnet50':
         resnet = resnet50.ResNet50(include_top=False, weights=None, input_shape=input_shape)
@@ -188,17 +189,16 @@ def generate_data(input_mask_generator, output_mask_generator, n, num_classes):
 
 def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_sampling=None,
           scaledown=0.005, weight_classes=False, save_model=False):
-    batch_size = 2
+    batch_size = 3
 
     if dataset == 'up-s31':
         train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
         # train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded/masks"
         # val_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
         monitor_dir = "./monitor_train/monitor_train_images"
-        # TODO create validation directory
         num_classes = 32
         # num_train_images = 6813
-        num_train_images = 2
+        num_train_images = 3
 
     assert os.path.isdir(train_dir), 'Invalid train directory'
     # assert os.path.isdir(val_dir), 'Invalid validation directory'
@@ -339,18 +339,32 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
                     inputs.append(input_labels)
 
             input_mask_array = np.array(inputs)
-            input_mask_array = input_mask_array[:batch_size, :, :, :]
+            input_mask_array1 = input_mask_array[:batch_size, :, :, :]
+            input_mask_array2 = input_mask_array[batch_size:, :, :, :]
 
-            smpls = smpl_model.predict(input_mask_array)
-            verts = verts_model.predict(input_mask_array)
-            projects = projects_model.predict(input_mask_array)
-            segs = np.reshape(segs_model.predict(input_mask_array),
-                              [-1, output_wh, output_wh, num_classes])
+            smpls1 = smpl_model.predict(input_mask_array1)
+            verts1 = verts_model.predict(input_mask_array1)
+            projects1 = projects_model.predict(input_mask_array1)
+            segs1 = np.reshape(segs_model.predict(input_mask_array1),
+                               [-1, output_wh, output_wh, num_classes])
+
+            smpls2 = smpl_model.predict(input_mask_array2)
+            verts2 = verts_model.predict(input_mask_array2)
+            projects2 = projects_model.predict(input_mask_array2)
+            segs2 = np.reshape(segs_model.predict(input_mask_array2),
+                               [-1, output_wh, output_wh, num_classes])
+
+            smpls = np.concatenate((smpls1, smpls2), axis=0)
+            verts = np.concatenate((verts1, verts2), axis=0)
+            projects = np.concatenate((projects1, projects2), axis=0)
+            segs = np.concatenate((segs1, segs2), axis=0)
+
             seg_maps = np.argmax(segs, axis=-1)
 
             print(smpls[0])
-            i = 0
-            while i < batch_size:
+            # i = 0
+            # while i < batch_size:
+            for i in range(smpls.shape[0]):
                 plt.figure(1)
                 plt.clf()
                 plt.imshow(seg_maps[i])
@@ -370,7 +384,7 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
                     plt.clf()
                     plt.imshow(input_mask_array[i, :, :, 0])
                     plt.savefig("./monitor_train/gt_seg_" + str(i) + ".png")
-                i += 1
+                # i += 1
 
             if save_model:
                 save_fname = "{dataset}_{output_wh}x{output_wh}_resnet".format(dataset=dataset,

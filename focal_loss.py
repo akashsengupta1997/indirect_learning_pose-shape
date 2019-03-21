@@ -19,7 +19,7 @@ def categorical_focal_loss(gamma=2.0, weight_classes=False):
         if weight_classes:
 
             weights = np.ones(32)
-            weights[0] = 1.0
+            weights[0] = 0.1
             weights[1] = 20.0
             weights[2] = 20.0
             weights[3] = 20.0
