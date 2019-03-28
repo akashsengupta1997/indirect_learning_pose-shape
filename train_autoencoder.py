@@ -192,13 +192,13 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
     batch_size = 3
 
     if dataset == 'up-s31':
-        train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
-        # train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded/masks"
+        # train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
+        train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded_small_glob_rot/masks"
         # val_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
         monitor_dir = "./monitor_train/monitor_train_images"
         num_classes = 32
-        # num_train_images = 6813
-        num_train_images = 3
+        num_train_images = 5932
+        # num_train_images = 3
 
     assert os.path.isdir(train_dir), 'Invalid train directory'
     # assert os.path.isdir(val_dir), 'Invalid validation directory'
