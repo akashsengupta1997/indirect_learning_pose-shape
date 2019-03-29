@@ -11,23 +11,23 @@ from keras import backend as K
 
 def compute_mask(batch_projects_with_depth):
     """
-    Outputs N x 6890 tensor of mask_vals: mask_val is either 500 (if vertex is invisible) or
+    Outputs N x num_vertices tensor of mask_vals: mask_val is either 500 (if vertex is invisible) or
     1 if visible.
     During projections to segmentation stage layer (projects_to_seg.py), this mask will be used
     to ensure that invisible vertices do not affect the segmentation output.
-    :param batch_projects_with_depth: N x 6890 x 3 tensor of projected vertices and their
+    :param batch_projects_with_depth: N x num_vertices x 3 tensor of projected vertices and their
     original depth values i.e. (u, v, z)
     :return:
     """
-    batch_pixels = tf.round(batch_projects_with_depth[:, :, :2])  # N x 6890 x 2
+    batch_pixels = tf.round(batch_projects_with_depth[:, :, :2])  # N x num_vertices x 2
     batch_pixels_with_depth = tf.concat([batch_pixels,
                                          tf.expand_dims(batch_projects_with_depth[:, :, 2], axis=2)],
-                                        axis=2)  # N x 6890 x 3
+                                        axis=2)  # N x num_vertices x 3
 
     masks = tf.map_fn(compute_mask_map_over_batch,
                       batch_pixels_with_depth,
                       dtype='float32',
-                      back_prop=False)
+                      back_prop=False)  # N x num_vertices
 
     return masks
 
@@ -36,15 +36,15 @@ def compute_mask_map_over_batch(pixels_with_depth):
     """
     Used in the map_fn call in compute_mask.
     Applied to each member of the batch in batch_pixels_with_depth.
-    It outputs a mask tensor with shape (6890,).
-    :param pixels_with_depth: 6890 x 3 tensor of rounded + projected vertices and their
+    It outputs a mask tensor with shape (num_vertices,).
+    :param pixels_with_depth: num_vertices x 3 tensor of rounded + projected vertices and their
     original depth values.
     :return: mask
     """
     img_wh = 96
-    num_pixels = pixels_with_depth.get_shape().as_list()[0]
-    indices = tf.expand_dims(tf.range(num_pixels, dtype='float32'), axis=1)
-    pixels_with_depth_and_index = tf.concat([pixels_with_depth, indices], axis=1)  # 6890 x 4
+    num_pixels = pixels_with_depth.get_shape().as_list()[0]  # num_vertices
+    indices = tf.expand_dims(tf.range(num_pixels, dtype='float32'), axis=1)  # num_vertices x 1
+    pixels_with_depth_and_index = tf.concat([pixels_with_depth, indices], axis=1)  # num_vertices x 4
 
     i = tf.range(0, img_wh)
     j = tf.range(0, img_wh)
@@ -54,18 +54,29 @@ def compute_mask_map_over_batch(pixels_with_depth):
     pixel_coords = tf.reshape(grid, [-1, 2])  # img_wh^2 x 2
     expanded_pixels_with_depth_and_index = tf.tile(tf.expand_dims(pixels_with_depth_and_index,
                                                                   axis=0),
-                                                   [img_wh*img_wh, 1, 1]) # img_wh^2 x 6890 x 4
+                                                   [img_wh*img_wh, 1, 1])  # img_wh^2 x num_vertices x 4
     min_indices = tf.map_fn(get_min_depth_vert_index_at_pixel,
                             [pixel_coords, expanded_pixels_with_depth_and_index],
                             back_prop=False,
                             # dtype='int32',
-                            dtype='float32')
-    # TODO int32 not supported on GPU - do map as float32 then cast afterwards
-    min_indices, _ = tf.unique(tf.squeeze(tf.cast(min_indices, dtype='int32')))
+                            dtype='float32')  # (img_wh^2,)
+
+    min_indices, _ = tf.unique(tf.squeeze(tf.cast(min_indices, dtype='int32')))  # (?,)
 
     mask = K.variable(np.ones(num_pixels) * 500)
     ones = tf.ones_like(min_indices, dtype='float32')
-    mask = tf.scatter_update(mask, min_indices, ones)
+    mask = tf.scatter_update(mask, min_indices, ones)  # (num_vertices,)
+
+    # expanded_pixel_coords = tf.tile(tf.expand_dims(pixel_coords, axis=1), [1, num_pixels, 1])
+    # print(expanded_pixel_coords.get_shape())
+    # vert_indices_at_pixels = tf.where(tf.reduce_all(tf.equal(expanded_pixel_coords,
+    #                                                          expanded_pixels_with_depth_and_index[:,:,:2]),
+    #                                                 axis=-1))
+    # print(vert_indices_at_pixels.get_shape())
+    # vert_at_pixels = tf.gather_nd(expanded_pixels_with_depth_and_index, vert_indices_at_pixels)
+    # print(vert_at_pixels.get_shape())
+    # vert_depths_at_pixels = vert_at_pixels[:, 2]
+    # print(vert_depths_at_pixels.get_shape())
 
     return mask
 
@@ -83,14 +94,14 @@ def get_min_depth_vert_index_at_pixel(input):
     """
     pixel_coord, pixels_with_depth_and_index = input
     num_pixels = pixels_with_depth_and_index.get_shape().as_list()[0]
-    pixel_coord = tf.tile(tf.expand_dims(pixel_coord, axis=0), [num_pixels, 1])  # 6890 x 2
+    pixel_coord = tf.tile(tf.expand_dims(pixel_coord, axis=0), [num_pixels, 1])  # num_vertices x 2
 
     vert_indices_at_pixel = tf.where(tf.reduce_all(tf.equal(pixel_coord,
                                                             pixels_with_depth_and_index[:, :2]),
-                                                   axis=1))
+                                                   axis=1))  # ? x 1
 
-    verts_at_pixel = tf.gather(pixels_with_depth_and_index, vert_indices_at_pixel)  # n x 1 x 4
-    vert_depths_at_pixel = verts_at_pixel[:, :, 2]  # n x 1
+    verts_at_pixel = tf.gather(pixels_with_depth_and_index, vert_indices_at_pixel)  # ? x 1 x 4
+    vert_depths_at_pixel = verts_at_pixel[:, :, 2]  # ? x 1
     is_empty = tf.equal(tf.size(vert_depths_at_pixel), tf.constant(0))
 
     min_depth_vert_at_pixel = tf.cond(is_empty,
@@ -107,5 +118,5 @@ def get_min_depth_vert_index_at_pixel(input):
     #                                                     dtype='int32'),
     #                                            axis=1)  # (1,)
 
-    min_depth_vert_index_at_pixel = tf.squeeze(min_depth_vert_at_pixel[:, :, 3], axis=1) # (1,)
+    min_depth_vert_index_at_pixel = tf.squeeze(min_depth_vert_at_pixel[:, :, 3], axis=1)  # (1,)
     return min_depth_vert_index_at_pixel

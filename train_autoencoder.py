@@ -26,7 +26,7 @@ from renderer import SMPLRenderer
 
 from focal_loss import categorical_focal_loss
 
-
+# TODO write code that only calls compute mask and see if runs on GPU or CPU
 def build_autoencoder(train_batch_size, input_shape, smpl_path, output_wh, num_classes,
                       encoder_architecture='resnet50', use_IEF=False, vertex_sampling=None,
                       scaledown=0.005):
