@@ -99,8 +99,8 @@ def build_debug_model(batch_size, smpl_path, output_img_wh, num_classes, vertex_
 
 
 def train(output_wh, num_classes, num_indices, vertex_sampling=None):
-    # train_indices = np.arange(num_indices)
-    train_indices = np.array([0, 1, 2])
+    train_indices = np.arange(num_indices)
+    # train_indices = np.array([0, 1, 2])
     labels = load_masks_from_indices(train_indices, (output_wh, output_wh))
     train_labels = np.reshape(labels, (-1, output_wh*output_wh, num_classes))
     segs_model, smpl_model, verts_model, projects_model = build_debug_model(num_indices,
@@ -126,7 +126,7 @@ def train(output_wh, num_classes, num_indices, vertex_sampling=None):
         from tensorflow.python.client import timeline
         tl = timeline.Timeline(run_metadata.step_stats)
         ctf = tl.generate_chrome_trace_format()
-        with open('timeline96.json', 'w') as f:
+        with open('timeline_decoder+renderer96_{trial}.json'.format(trial=trial), 'w') as f:
             f.write(ctf)
 
         # renderer = SMPLRenderer()
@@ -161,5 +161,4 @@ def train(output_wh, num_classes, num_indices, vertex_sampling=None):
         #             plt.savefig("./test_outputs/gt_seg_" + str(idx) + ".png")
 
 
-
-train(96, 32, 3, vertex_sampling=None)
+train(96, 32, 1, vertex_sampling=None)

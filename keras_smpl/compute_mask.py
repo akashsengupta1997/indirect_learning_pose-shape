@@ -53,7 +53,7 @@ def compute_mask_map_over_batch(pixels_with_depth):
     grid = tf.cast(tf.stack([t1, t2], axis=2), dtype='float32')  # img_wh x img_wh x 2
     pixel_coords = tf.reshape(grid, [-1, 2])  # img_wh^2 x 2
     expanded_pixels_with_depth_and_index = tf.tile(tf.expand_dims(pixels_with_depth_and_index,
-                                                                  axis=0),
+                                                                  axis=0, name='big_tile1'),
                                                    [img_wh*img_wh, 1, 1])  # img_wh^2 x num_vertices x 4
     min_indices = tf.map_fn(get_min_depth_vert_index_at_pixel,
                             [pixel_coords, expanded_pixels_with_depth_and_index],
@@ -94,7 +94,7 @@ def get_min_depth_vert_index_at_pixel(input):
     """
     pixel_coord, pixels_with_depth_and_index = input
     num_pixels = pixels_with_depth_and_index.get_shape().as_list()[0]
-    pixel_coord = tf.tile(tf.expand_dims(pixel_coord, axis=0), [num_pixels, 1])  # num_vertices x 2
+    pixel_coord = tf.tile(tf.expand_dims(pixel_coord, axis=0), [num_pixels, 1], name='big_tile2')  # num_vertices x 2
 
     vert_indices_at_pixel = tf.where(tf.reduce_all(tf.equal(pixel_coord,
                                                             pixels_with_depth_and_index[:, :2]),

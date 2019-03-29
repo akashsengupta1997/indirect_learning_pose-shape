@@ -54,7 +54,7 @@ def projects_to_seg(input, img_wh, vertex_sampling):
                                 [1, num_indices, 1])  # img_wh^2 x num_indices x 2
 
         diff = tf.subtract(part_projects, expanded_grid)  # N x img_wh^2 x num_indices x 2
-        norm = tf.norm(diff, axis=3)  # N x img_wh^2 x num_indices
+        norm = tf.norm(diff, axis=3, name='big_norm1')  # N x img_wh^2 x num_indices
         norm = tf.multiply(norm, part_mask_vals)
         exp = tf.exp(tf.negative(norm))  # N x img_wh^2 x num_indices
         scores = tf.reduce_max(exp, axis=2)  # N x img_wh^2
