@@ -61,9 +61,9 @@ def compute_mask_map_over_batch(pixels_with_depth):
                                 # dtype='int32',
                                 dtype='float32')  # img_wh^2 x 1 x 1 x 4
 
-    # min_depth_verts = tf.squeeze(tf.cast(min_depth_verts, dtype='int32'))  # (img_wh^2,)
-    # min_indices, _ = tf.unique(min_depth_verts[:, 3])  # (?,), ? is number of visible vertices
-    min_indices, _ = tf.unique(tf.squeeze(tf.cast(min_depth_verts, dtype='int32')))  # (?,)
+    min_depth_verts = tf.squeeze(tf.cast(min_depth_verts, dtype='int32'))  # img_wh^2 x 4
+    min_indices, _ = tf.unique(min_depth_verts[:, 3])  # (?,), ? is number of visible vertices
+    # min_indices, _ = tf.unique(tf.squeeze(tf.cast(min_indices, dtype='int32')))  # (?,)
 
     mask = K.variable(np.ones(num_pixels) * 500)
     ones = tf.ones_like(min_indices, dtype='float32')
@@ -120,6 +120,6 @@ def get_min_depth_vert_index_at_pixel(input):
     #                                                     dtype='int32'),
     #                                            axis=1)  # (1,)
 
-    min_depth_vert_index_at_pixel = tf.squeeze(min_depth_vert_at_pixel[:, :, 3], axis=1)  # (1,)
-    return min_depth_vert_index_at_pixel
-    # return min_depth_vert_at_pixel
+    # min_depth_vert_index_at_pixel = tf.squeeze(min_depth_vert_at_pixel[:, :, 3], axis=1)  # (1,)
+    # return min_depth_vert_index_at_pixel
+    return min_depth_vert_at_pixel
