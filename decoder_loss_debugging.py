@@ -14,6 +14,9 @@ from keras_smpl.projection import persepective_project, orthographic_project, \
 from keras_smpl.projects_to_seg import projects_to_seg
 from keras_smpl.set_cam_params import set_cam_params, load_mean_set_cam_params
 from keras_smpl.compute_mask import compute_mask
+from keras_smpl.compute_mask_batch_map_only import compute_mask_batch_map_only
+from keras_smpl.compute_mask_without_map import compute_mask_without_map
+
 from renderer import SMPLRenderer
 
 from focal_loss import categorical_focal_loss
@@ -81,6 +84,8 @@ def build_debug_model(batch_size, smpl_path, output_img_wh, num_classes, vertex_
                                  arguments={"vertex_sampling": vertex_sampling},
                                  name='projection')([verts, smpls])
     masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
+    # masks = Lambda(compute_mask_batch_map_only, name='compute_mask')(projects_with_depth)
+    # masks = Lambda(compute_mask_without_map, name='compute_mask')(projects_with_depth)
     segs = Lambda(projects_to_seg,
                   arguments={'img_wh': output_img_wh,
                              'vertex_sampling': vertex_sampling},
@@ -122,12 +127,12 @@ def train(output_wh, num_classes, num_indices, vertex_sampling=None):
         print "Epoch", trial
         segs_model.fit(train_indices, train_labels, batch_size=num_indices, verbose=1)
 
-        # Profiling
-        from tensorflow.python.client import timeline
-        tl = timeline.Timeline(run_metadata.step_stats)
-        ctf = tl.generate_chrome_trace_format()
-        with open('timeline_decoder+renderer96_{trial}.json'.format(trial=trial), 'w') as f:
-            f.write(ctf)
+        # # Profiling
+        # from tensorflow.python.client import timeline
+        # tl = timeline.Timeline(run_metadata.step_stats)
+        # ctf = tl.generate_chrome_trace_format()
+        # with open('timeline_decoder+renderer96_{trial}.json'.format(trial=trial), 'w') as f:
+        #     f.write(ctf)
 
         # renderer = SMPLRenderer()
         #
@@ -161,4 +166,4 @@ def train(output_wh, num_classes, num_indices, vertex_sampling=None):
         #             plt.savefig("./test_outputs/gt_seg_" + str(idx) + ".png")
 
 
-train(96, 32, 1, vertex_sampling=None)
+train(48, 32, 4, vertex_sampling=None)

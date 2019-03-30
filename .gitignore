@@ -4,6 +4,7 @@
 *scratch*
 .idea/*
 .DS_Store
+*.json
 
 *.png
 *.pdf
