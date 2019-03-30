@@ -25,7 +25,7 @@ def compute_mask_without_map(batch_projects_with_depth):
                                         axis=2)  # N x num_vertices x 3
 
     masks = []
-    for i in range(2):  # TODO range should be over batch size
+    for i in range(4):  # TODO range should be over batch size
         pixels_with_depth = batch_pixels_with_depth[i]
         mask = compute_mask_loop_over_batch(pixels_with_depth)
         masks.append(mask)
@@ -44,7 +44,7 @@ def compute_mask_loop_over_batch(pixels_with_depth):
     original depth values.
     :return: mask
     """
-    img_wh = 48
+    img_wh = 96
     num_pixels = pixels_with_depth.get_shape().as_list()[0]  # num_vertices
     indices = tf.expand_dims(tf.range(num_pixels, dtype='float32'), axis=1)  # num_vertices x 1
     pixels_with_depth_and_index = tf.concat([pixels_with_depth, indices], axis=1)  # num_vertices x 4

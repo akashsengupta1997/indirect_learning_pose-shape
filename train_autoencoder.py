@@ -193,7 +193,7 @@ def generate_data(input_mask_generator, output_mask_generator, n, num_classes):
 
 def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_sampling=None,
           scaledown=0.005, weight_classes=False, save_model=False):
-    batch_size = 3
+    batch_size = 4
 
     if dataset == 'up-s31':
         # train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
@@ -407,4 +407,4 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
 
 
 train(256, 96, 'up-s31', use_IEF=True, vertex_sampling=None, scaledown=0.005,
-      weight_classes=True, save_model=True)
+      weight_classes=True, save_model=False)

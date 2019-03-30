@@ -41,7 +41,7 @@ def compute_mask_map_over_batch(pixels_with_depth):
     original depth values.
     :return: mask
     """
-    img_wh = 48
+    img_wh = 96
     num_pixels = pixels_with_depth.get_shape().as_list()[0]  # num_vertices
     indices = tf.expand_dims(tf.range(num_pixels, dtype='float32'), axis=1)  # num_vertices x 1
     pixels_with_depth_and_index = tf.concat([pixels_with_depth, indices], axis=1)  # num_vertices x 4
