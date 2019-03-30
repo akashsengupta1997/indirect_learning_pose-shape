@@ -18,6 +18,8 @@ from keras_smpl.projects_to_seg import projects_to_seg
 from keras_smpl.concat_mean_param import concat_mean_param
 from keras_smpl.set_cam_params import load_mean_set_cam_params
 from keras_smpl.compute_mask import compute_mask
+from keras_smpl.compute_mask_batch_map_only import compute_mask_batch_map_only
+from keras_smpl.compute_mask_without_map import compute_mask_without_map
 
 from generators.image_generator_with_fname import ImagesWithFnames
 
@@ -127,6 +129,8 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_wh, num_c
                                  arguments={'vertex_sampling': vertex_sampling},
                                  name='project')([verts, final_param])
     masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
+    # masks = Lambda(compute_mask_batch_map_only, name='compute_mask')(projects_with_depth)
+    # masks = Lambda(compute_mask_without_map, name='compute_mask')(projects_with_depth)
     segs = Lambda(projects_to_seg,
                   arguments={'img_wh': output_wh,
                              'vertex_sampling': vertex_sampling},
