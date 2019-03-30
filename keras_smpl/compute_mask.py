@@ -59,7 +59,8 @@ def compute_mask_map_over_batch(pixels_with_depth):
     min_depth_verts = tf.map_fn(get_min_depth_vert_index_at_pixel,
                                 [pixel_coords, expanded_pixels_with_depth_and_index],
                                 back_prop=False,
-                                dtype='float32')  # img_wh^2 x 1 x 1 x 4
+                                dtype='float32',
+                                parallel_iterations=128)  # img_wh^2 x 1 x 1 x 4
 
     min_depth_verts = tf.squeeze(tf.cast(min_depth_verts, dtype='int32'))  # img_wh^2 x 4
     min_indices, _ = tf.unique(min_depth_verts[:, 3])  # (?,), ? is number of visible vertices
@@ -67,7 +68,6 @@ def compute_mask_map_over_batch(pixels_with_depth):
     mask = K.variable(np.ones(num_pixels) * 500)
     ones = tf.ones_like(min_indices, dtype='float32')
     mask = tf.scatter_update(mask, min_indices, ones)  # (num_vertices,)
-    mask = tf.stop_gradient(mask)
 
     return mask
 
