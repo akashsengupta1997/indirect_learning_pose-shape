@@ -155,17 +155,15 @@ def generate_data(image_generator, mask_generator, n, num_classes):
 
 def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
           scaledown=0.005, weight_classes=False, save_model=False):
-    batch_size = 3
+    batch_size = 4
 
     if dataset == 'up-s31':
-        train_image_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/images"
-        train_label_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
+        train_image_dir = "/data/cvfs/as2562/4th_year_proj_datasets/s31_padded_small_glob_rot/images"
+        train_label_dir = "/data/cvfs/as2562/4th_year_proj_datasets/s31_padded_small_glob_rot/masks"
         monitor_dir = "./full_network_monitor_train/monitor_train_images"
         # TODO create validation directory
         num_classes = 32
-        # num_train_images = 8515
-        # num_train_images = 31
-        num_train_images = 3
+        num_train_images = 5932
 
     assert os.path.isdir(train_image_dir), 'Invalid image directory'
     assert os.path.isdir(train_label_dir), 'Invalid label directory'
@@ -297,13 +295,13 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
         #         yield (val_data, reshaped_val_labels)
 
         history = segs_model.fit_generator(train_data_gen(),
-                                           steps_per_epoch=int(num_train_images/batch_size),
+                                           steps_per_epoch=int((num_train_images/batch_size)/5),
                                            nb_epoch=1,
                                            verbose=1)
 
         renderer = SMPLRenderer()
 
-        if trial % 50 == 0:
+        if trial % 5 == 0:
             inputs = []
             for fname in sorted(os.listdir(monitor_dir)):
                 if fname.endswith(".png"):
@@ -316,18 +314,30 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
                     inputs.append(input_image)
 
             input_images_array = np.array(inputs)
-            input_images_array = input_images_array[:batch_size, :, :, :]
+            input_images_array1 = input_images_array[:batch_size, :, :, :]
+            input_images_array2 = input_images_array[batch_size:, :, :, :]
 
-            smpls = smpl_model.predict(input_images_array)
-            verts = verts_model.predict(input_images_array)
-            projects = projects_model.predict(input_images_array)
-            segs = np.reshape(segs_model.predict(input_images_array),
-                              [-1, output_wh, output_wh, num_classes])
+            smpls1 = smpl_model.predict(input_images_array1)
+            verts1 = verts_model.predict(input_images_array1)
+            projects1 = projects_model.predict(input_images_array1)
+            segs1 = np.reshape(segs_model.predict(input_images_array1),
+                               [-1, output_wh, output_wh, num_classes])
+
+            smpls2 = smpl_model.predict(input_images_array2)
+            verts2 = verts_model.predict(input_images_array2)
+            projects2 = projects_model.predict(input_images_array2)
+            segs2 = np.reshape(segs_model.predict(input_images_array2),
+                               [-1, output_wh, output_wh, num_classes])
+
+            smpls = np.concatenate((smpls1, smpls2), axis=0)
+            verts = np.concatenate((verts1, verts2), axis=0)
+            projects = np.concatenate((projects1, projects2), axis=0)
+            segs = np.concatenate((segs1, segs2), axis=0)
+
             seg_maps = np.argmax(segs, axis=-1)
 
             print(smpls[0])
-            i = 0
-            while i < batch_size:
+            for i in range(smpls.shape[0]):
                 plt.figure(1)
                 plt.clf()
                 plt.imshow(seg_maps[i])
@@ -347,7 +357,6 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
                     plt.clf()
                     plt.imshow(input_images_array[i, :, :, :])
                     plt.savefig("./full_network_monitor_train/image_" + str(i) + ".png")
-                i += 1
 
         if save_model:
             save_fname = "{dataset}_{output_wh}x{output_wh}_resnet".format(dataset=dataset,
