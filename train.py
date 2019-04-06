@@ -358,20 +358,20 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
                     plt.imshow(input_images_array[i, :, :, :])
                     plt.savefig("./full_network_monitor_train/image_" + str(i) + ".png")
 
-        if save_model:
-            save_fname = "{dataset}_{output_wh}x{output_wh}_resnet".format(dataset=dataset,
-                                                                           output_wh=output_wh)
-            if use_IEF:
-                save_fname += "_ief"
-            save_fname += "_scaledown{scaledown}".format(
-                scaledown=str(scaledown).replace('.', ''))
-            if vertex_sampling is not None:
-                save_fname += "_vs{vertex_sampling}".format(vertex_sampling=vertex_sampling)
-            if weight_classes:
-                save_fname += "_weighted"
-            save_fname += "_{trial}.hdf5".format(trial=trial)
-            smpl_model.save(os.path.join('./test_models', save_fname))
-            print('SAVE NAME', save_fname)
+            if save_model:
+                save_fname = "{dataset}_{output_wh}x{output_wh}_resnet".format(dataset=dataset,
+                                                                               output_wh=output_wh)
+                if use_IEF:
+                    save_fname += "_ief"
+                save_fname += "_scaledown{scaledown}".format(
+                    scaledown=str(scaledown).replace('.', ''))
+                if vertex_sampling is not None:
+                    save_fname += "_vs{vertex_sampling}".format(vertex_sampling=vertex_sampling)
+                if weight_classes:
+                    save_fname += "_weighted"
+                save_fname += "_{trial}.hdf5".format(trial=trial)
+                smpl_model.save(os.path.join('./test_models', save_fname))
+                print('SAVE NAME', save_fname)
 
     print("Finished")
 
