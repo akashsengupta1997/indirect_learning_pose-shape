@@ -5,9 +5,11 @@
 .idea/*
 .DS_Store
 *.json
+*.hdf5
 
 *.png
 *.pdf
 *.pages
+*.rtf
 
 tf_smpl/*
