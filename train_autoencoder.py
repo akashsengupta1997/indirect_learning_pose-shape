@@ -272,7 +272,7 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
                                                                                     "./neutral_smpl_with_cocoplus_reg.pkl",
                                                                                     batch_size)
         print("Model loaded.")
-        
+
     else:
         if multi_gpu:
             segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
@@ -297,12 +297,12 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
                 vertex_sampling=vertex_sampling,
                 scaledown=scaledown)
 
-            segs_model.compile(optimizer=adam_optimiser,
-                               loss=categorical_focal_loss(gamma=5.0,
-                                                           weight_classes=weight_classes),
-                               metrics=['accuracy'])
+    segs_model.compile(optimizer=adam_optimiser,
+                       loss=categorical_focal_loss(gamma=5.0,
+                                                   weight_classes=weight_classes),
+                       metrics=['accuracy'])
 
-            print("Model compiled.")
+    print("Model compiled.")
 
     for trial in range(4000):
         print("Fitting", trial)
