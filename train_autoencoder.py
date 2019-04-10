@@ -115,7 +115,8 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_wh, num_c
     return segs_model, smpl_model, verts_model, projects_model
 
 
-def build_full_model_from_saved_model(smpl_model, output_wh, smpl_path, batch_size):
+def build_full_model_from_saved_model(smpl_model, output_wh, smpl_path, batch_size,
+                                      num_classes):
     inp = smpl_model.input
     smpl = smpl_model.output
     verts = SMPLLayer(smpl_path, batch_size=batch_size)(smpl)
@@ -127,6 +128,8 @@ def build_full_model_from_saved_model(smpl_model, output_wh, smpl_path, batch_si
                   arguments={'img_wh': output_wh,
                              'vertex_sampling': None},
                   name='segment')([projects_with_depth, masks])
+    segs = Reshape((output_wh * output_wh, num_classes))(segs)
+    segs = Activation('softmax')(segs)
 
     verts_model = Model(inputs=inp, outputs=verts)
     projects_model = Model(inputs=inp, outputs=projects_with_depth)
@@ -270,7 +273,8 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
         verts_model, projects_model, segs_model = build_full_model_from_saved_model(smpl_model,
                                                                                     output_wh,
                                                                                     "./neutral_smpl_with_cocoplus_reg.pkl",
-                                                                                    batch_size)
+                                                                                    batch_size,
+                                                                                    num_classes)
         print("Model loaded.")
 
     else:
