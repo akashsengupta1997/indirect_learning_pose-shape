@@ -3,8 +3,9 @@ import tensorflow as tf
 import os
 import cv2
 from matplotlib import pyplot as plt
+import deepdish as dd
 
-from keras.models import Model
+from keras.models import Model, load_model
 from keras.layers import Input, Dense, Lambda, Reshape, Conv2D, MaxPooling2D, \
     BatchNormalization, Activation, Add, Concatenate
 from keras.preprocessing.image import ImageDataGenerator
@@ -47,40 +48,6 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_wh, num_c
         inp = resnet.input
         img_features = resnet.output
         img_features = Reshape((2048,))(img_features)
-
-    elif encoder_architecture == 'simple':
-        inp = Input(shape=input_shape)  # using 64 x 64 x 32 input with simple encoder for now
-
-        block1 = Conv2D(256, 3, padding='same')(inp)
-        block1 = BatchNormalization()(block1)
-        block1 = Activation('relu')(block1)
-        block1 = MaxPooling2D()(block1)
-
-        block2 = Conv2D(256, 3, padding='same')(block1)
-        block2 = BatchNormalization()(block2)
-        block2 = Activation('relu')(block2)
-        block2 = MaxPooling2D()(block2)
-
-        block3 = Conv2D(512, 3, padding='same')(block2)
-        block3 = BatchNormalization()(block3)
-        block3 = Activation('relu')(block3)
-        block3 = MaxPooling2D()(block3)
-
-        block4 = Conv2D(512, 3, padding='same')(block3)
-        block4 = BatchNormalization()(block4)
-        block4 = Activation('relu')(block4)
-        block4 = MaxPooling2D()(block4)
-
-        block5 = Conv2D(1024, 3, padding='same')(block4)
-        block5 = BatchNormalization()(block5)
-        block5 = Activation('relu')(block5)
-        block5 = MaxPooling2D()(block5)
-
-        block6 = Conv2D(2048, 3, padding='same')(block5)
-        block6 = BatchNormalization()(block6)
-        block6 = Activation('relu')(block6)
-        block6 = MaxPooling2D()(block6)
-        img_features = Reshape((2048,))(block6)
 
     if use_IEF:
         # --- IEF MODULE ---
@@ -148,6 +115,26 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_wh, num_c
     return segs_model, smpl_model, verts_model, projects_model
 
 
+def build_full_model_from_saved_model(smpl_model, output_wh, smpl_path, batch_size):
+    inp = smpl_model.input
+    smpl = smpl_model.output
+    verts = SMPLLayer(smpl_path, batch_size=batch_size)(smpl)
+    projects_with_depth = Lambda(orthographic_project2,
+                                 arguments={'vertex_sampling': None},
+                                 name='project')([verts, smpl])
+    masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
+    segs = Lambda(projects_to_seg,
+                  arguments={'img_wh': output_wh,
+                             'vertex_sampling': None},
+                  name='segment')([projects_with_depth, masks])
+
+    verts_model = Model(inputs=inp, outputs=verts)
+    projects_model = Model(inputs=inp, outputs=projects_with_depth)
+    segs_model = Model(inputs=inp, outputs=segs)
+
+    return verts_model, projects_model, segs_model
+
+
 def classlab(labels, num_classes):
     """
     Function to convert HxWx1 labels image to HxWxC one hot encoded matrix.
@@ -192,7 +179,7 @@ def generate_data(input_mask_generator, output_mask_generator, n, num_classes):
 
 
 def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_sampling=None,
-          scaledown=0.005, weight_classes=False, save_model=False):
+          scaledown=0.005, weight_classes=False, save_model=False, resume_from=None):
     batch_size = 4
 
     if dataset == 'up-s31':
@@ -273,35 +260,49 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
     # plt.imshow(y_post[:, :, 13])
 
     adam_optimiser = Adam(lr=0.0001)
-    if multi_gpu:
-        segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
-            batch_size,
-            # (input_wh, input_wh, num_classes),
-            (input_wh, input_wh, 1),
-            "./neutral_smpl_with_cocoplus_reg.pkl",
-            output_wh,
-            num_classes)
-        parallel_segs_model = multi_gpu_model(segs_model, gpus=2)
-        parallel_segs_model.compile(optimizer=adam_optimiser,
-                                    loss=categorical_focal_loss(gamma=5.0),
-                                    metrics=['accuracy'])
+
+    if resume_from is not None:
+        print("Resuming model from ", resume_from)
+        smpl_model = load_model(os.path.join("./test_models", resume_from),
+                                custom_objects={'dd': dd,
+                                                'tf': tf})
+
+        verts_model, projects_model, segs_model = build_full_model_from_saved_model(smpl_model,
+                                                                                    output_wh,
+                                                                                    "./neutral_smpl_with_cocoplus_reg.pkl",
+                                                                                    batch_size)
+        print("Model loaded.")
+        
     else:
-        segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
-            batch_size,
-            (input_wh, input_wh, 1),
-            "./neutral_smpl_with_cocoplus_reg.pkl",
-            output_wh,
-            num_classes,
-            use_IEF=use_IEF,
-            vertex_sampling=vertex_sampling,
-            scaledown=scaledown)
+        if multi_gpu:
+            segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
+                batch_size,
+                # (input_wh, input_wh, num_classes),
+                (input_wh, input_wh, 1),
+                "./neutral_smpl_with_cocoplus_reg.pkl",
+                output_wh,
+                num_classes)
+            parallel_segs_model = multi_gpu_model(segs_model, gpus=2)
+            parallel_segs_model.compile(optimizer=adam_optimiser,
+                                        loss=categorical_focal_loss(gamma=5.0),
+                                        metrics=['accuracy'])
+        else:
+            segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
+                batch_size,
+                (input_wh, input_wh, 1),
+                "./neutral_smpl_with_cocoplus_reg.pkl",
+                output_wh,
+                num_classes,
+                use_IEF=use_IEF,
+                vertex_sampling=vertex_sampling,
+                scaledown=scaledown)
 
-        segs_model.compile(optimizer=adam_optimiser,
-                           loss=categorical_focal_loss(gamma=5.0,
-                                                       weight_classes=weight_classes),
-                           metrics=['accuracy'])
+            segs_model.compile(optimizer=adam_optimiser,
+                               loss=categorical_focal_loss(gamma=5.0,
+                                                           weight_classes=weight_classes),
+                               metrics=['accuracy'])
 
-    print("Model compiled.")
+            print("Model compiled.")
 
     for trial in range(4000):
         print("Fitting", trial)
@@ -407,4 +408,4 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
 
 
 train(256, 96, 'up-s31', use_IEF=True, vertex_sampling=None, scaledown=0.005,
-      weight_classes=True, save_model=False)
+      weight_classes=True, save_model=False, resume_from=None)
