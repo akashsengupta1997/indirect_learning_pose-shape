@@ -102,7 +102,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_wh, num_c
                   arguments={'img_wh': output_wh,
                              'vertex_sampling': vertex_sampling},
                   name='segment')([projects_with_depth, masks])
-    segs = Reshape((output_wh * output_wh, num_classes))(segs)
+    segs = Reshape((output_wh * output_wh, num_classes), name="final_reshape")(segs)
     segs = Activation('softmax', name="final_softmax")(segs)
 
     segs_model = Model(inputs=inp, outputs=segs)
@@ -128,7 +128,7 @@ def build_full_model_from_saved_model(smpl_model, output_wh, smpl_path, batch_si
                   arguments={'img_wh': output_wh,
                              'vertex_sampling': None},
                   name='segment')([projects_with_depth, masks])
-    segs = Reshape((output_wh * output_wh, num_classes))(segs)
+    segs = Reshape((output_wh * output_wh, num_classes), name="final_reshape")(segs)
     segs = Activation('softmax', name="final_softmax")(segs)
 
     verts_model = Model(inputs=inp, outputs=verts)
