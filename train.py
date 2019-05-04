@@ -158,8 +158,10 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
     batch_size = 4
 
     if dataset == 'up-s31':
-        train_image_dir = "/data/cvfs/as2562/4th_year_proj_datasets/s31_padded_small_glob_rot/images"
-        train_label_dir = "/data/cvfs/as2562/4th_year_proj_datasets/s31_padded_small_glob_rot/masks"
+        # train_image_dir = "/data/cvfs/as2562/4th_year_proj_datasets/s31_padded_small_glob_rot/images"
+        # train_label_dir = "/data/cvfs/as2562/4th_year_proj_datasets/s31_padded_small_glob_rot/masks"
+        train_image_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded_small_glob_rot/images"
+        train_label_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded_small_glob_rot/masks"
         monitor_dir = "./full_network_monitor_train/monitor_train_images"
         # TODO create validation directory
         num_classes = 32
@@ -171,22 +173,22 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
     # assert os.path.isdir(val_label_dir), 'Invalid validation label directory'
 
     train_image_data_gen_args = dict(
-        rotation_range=40,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        shear_range=0.2,
-        zoom_range=0.2,
-        horizontal_flip=True,
+        rotation_range=10,
+        width_shift_range=0.0,
+        height_shift_range=0.0,
+        shear_range=0.1,
+        zoom_range=0.1,
+        horizontal_flip=False,
         rescale=1/255.0,
         fill_mode='nearest')
 
     train_mask_data_gen_args = dict(
-        rotation_range=40,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        shear_range=0.2,
-        zoom_range=0.2,
-        horizontal_flip=True,
+        rotation_range=10,
+        width_shift_range=0.0,
+        height_shift_range=0.0,
+        shear_range=0.1,
+        zoom_range=0.1,
+        horizontal_flip=False,
         fill_mode='nearest')
 
     val_image_data_gen_args = dict(
@@ -196,14 +198,14 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
     val_mask_data_gen_args = dict(
         fill_mode='nearest')
 
-    # TODO add back augmentation
-    train_image_datagen = ImageDataGenerator(**val_image_data_gen_args)
-    train_mask_datagen = ImageDataGenerator(**val_mask_data_gen_args)
+    # TODO play with augmentation
+    train_image_datagen = ImageDataGenerator(**train_image_data_gen_args)
+    train_mask_datagen = ImageDataGenerator(**train_mask_data_gen_args)
     # val_image_datagen = ImageDataGenerator(**val_image_data_gen_args)
     # val_mask_datagen = ImageDataGenerator(**val_mask_data_gen_args)
 
     # Provide the same seed to flow methods for train generators
-    seed = 1
+    seed = 212
     train_image_generator = train_image_datagen.flow_from_directory(
         train_image_dir,
         batch_size=batch_size,
@@ -359,7 +361,7 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
                     plt.savefig("./full_network_monitor_train/image_" + str(i) + ".png")
 
             if save_model:
-                save_fname = "{dataset}_{output_wh}x{output_wh}_resnet".format(dataset=dataset,
+                save_fname = "{dataset}_{output_wh}x{output_wh}_resnet_augmented".format(dataset=dataset,
                                                                                output_wh=output_wh)
                 if use_IEF:
                     save_fname += "_ief"
@@ -376,6 +378,6 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
     print("Finished")
 
 
-train(256, 96, 'up-s31', use_IEF=True, vertex_sampling=None, scaledown=0.005,
+train(256, 48, 'up-s31', use_IEF=True, vertex_sampling=None, scaledown=0.005,
       weight_classes=True, save_model=True)
 
