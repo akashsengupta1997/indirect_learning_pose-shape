@@ -38,27 +38,31 @@ def visualise_and_save(fname, padded_img, verts, projects, seg_maps, renderer, i
     plt.imshow(seg_maps[0])
     if save:
         plt.savefig(os.path.join(save_dir,
-                                 "{fname}_seg.png").format(fname=fname))
+                                 "{fname}_seg.png").format(fname=fname),
+                    bbox_inches='tight', pad_inches=0)
     plt.figure(2)
     plt.clf()
     plt.scatter(projects[0, :, 0], projects[0, :, 1], s=1)
     plt.gca().set_aspect('equal', adjustable='box')
     if save:
         plt.savefig(os.path.join(save_dir,
-                                 "{fname}_projects.png").format(fname=fname))
+                                 "{fname}_projects.png").format(fname=fname),
+                    bbox_inches='tight', pad_inches=0)
     plt.figure(3)
     plt.clf()
     rend_img = renderer(verts=verts[0], render_seg=False)
     plt.imshow(rend_img)
     if save:
         plt.savefig(os.path.join(save_dir,
-                                 "{fname}_rend.png").format(fname=fname))
+                                 "{fname}_rend.png").format(fname=fname),
+                    bbox_inches='tight', pad_inches=0)
     plt.figure(4)
     plt.clf()
     plt.imshow(padded_img[0])
     if save:
         plt.savefig(os.path.join(save_dir,
-                                 "{fname}_input.png").format(fname=fname))
+                                 "{fname}_input.png").format(fname=fname),
+                    bbox_inches='tight', pad_inches=0)
     if overlay_projects:
         plt.figure(5)
         plt.clf()
@@ -71,7 +75,8 @@ def visualise_and_save(fname, padded_img, verts, projects, seg_maps, renderer, i
         plt.gca().invert_yaxis()
         if save:
             plt.savefig(os.path.join(save_dir,
-                                     "{fname}_verts_overlay.png").format(fname=fname))
+                                     "{fname}_verts_overlay.png").format(fname=fname),
+                        bbox_inches='tight', pad_inches=0)
     if not save:
         plt.show()
 
@@ -139,6 +144,6 @@ predict('/Users/Akash_Sengupta/Documents/4th_year_project_datasets/my_singlepers
         48,
         'up-s31_48x48_resnet_ief_scaledown0005_arms_weighted_2_bg_weighted_0point3_gamma2_1630.hdf5',
         save=True,
-        save_dir='./full_network_test/',
+        save_dir='./results/my_singleperson_imgs/',
         pad=True,
         overlay_projects=True)
