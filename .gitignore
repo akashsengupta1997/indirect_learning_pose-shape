@@ -11,5 +11,7 @@
 *.pdf
 *.pages
 *.rtf
+*.mp4
+*.MOV
 
 tf_smpl/*
