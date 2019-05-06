@@ -29,7 +29,10 @@ def load_input_seg(image_dir, fname, input_wh, num_classes):
     return input_seg
 
 
-def visualise_and_save(fname, verts, projects, seg_maps, renderer, save, save_dir=None):
+def visualise_and_save(fname, padded_img, verts, projects, seg_maps, renderer, input_wh,
+                       output_wh, save=False, save_dir=None, overlay_projects=False):
+    fname, _ = os.path.splitext(fname)
+    fname = fname[:5]
     plt.figure(1)
     plt.clf()
     plt.imshow(seg_maps[0])
@@ -49,7 +52,28 @@ def visualise_and_save(fname, verts, projects, seg_maps, renderer, save, save_di
     if save:
         plt.savefig(os.path.join(save_dir,
                                  "{fname}_rend.png").format(fname=fname))
-    else:
+    plt.figure(4)
+    plt.clf()
+    plt.imshow(padded_img)
+    if save:
+        plt.savefig(os.path.join(save_dir,
+                                 "{fname}_orig_img.png").format(fname=fname),
+                    bbox_inches='tight', pad_inches=0)
+    if overlay_projects:
+        plt.figure(5)
+        plt.clf()
+        scatter_scale = float(input_wh) / output_wh
+        plt.scatter(projects[0, :, 0] * scatter_scale, projects[0, :, 1] * scatter_scale,
+                    s=1)
+        plt.gca().set_aspect('equal', adjustable='box')
+        plt.imshow(cv2.flip(cv2.resize(padded_img, (input_wh, input_wh)), 0),
+                   alpha=0.9)
+        plt.gca().invert_yaxis()
+        if save:
+            plt.savefig(os.path.join(save_dir,
+                                     "{fname}_verts_overlay.png").format(fname=fname),
+                        bbox_inches='tight', pad_inches=0)
+    if not save:
         plt.show()
 
 
@@ -74,8 +98,9 @@ def build_full_model(smpl_model, output_wh, smpl_path, batch_size=1):
 
 
 def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=False,
-                        save_dir=None):
+                        save_dir=None, overlay_projects=True):
     test_image_dir = '/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks/train'
+    orig_image_dir = '/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/images/train'
     renderer = SMPLRenderer()
     smpl_model = load_model(os.path.join("./autoencoder_weights", model_fname),
                             custom_objects={'dd': dd,
@@ -93,6 +118,10 @@ def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=Fals
         if fname.endswith(".png"):
             print(fname)
             input_seg = load_input_seg(test_image_dir, fname, input_wh, num_classes)
+            orig_img = cv2.imread(os.path.join(orig_image_dir, fname[:5] + "_image.png"))
+            orig_img = cv2.resize(orig_img, (input_wh, input_wh))
+            orig_img = orig_img[..., ::-1]
+            orig_img = orig_img * (1.0 / 255)
 
             start = time.time()
             verts = verts_model.predict(input_seg)
@@ -105,11 +134,16 @@ def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=Fals
             segs_pred_times.append(time.time() - start)
             seg_maps = np.argmax(segs, axis=-1)
 
-            visualise_and_save(fname, verts, projects, seg_maps, renderer, save=save, save_dir=save_dir)
+            visualise_and_save(fname, orig_img, verts, projects, seg_maps, renderer, input_wh,
+                               output_wh, save=save, save_dir=save_dir,
+                               overlay_projects=overlay_projects)
             print("Average vertices predict time:", np.mean(verts_pred_times))
             print("Average segmentation predict time:", np.mean(segs_pred_times))
 
 
-predict_autoencoder(256, 64, 32, 'up-s31_64x64_resnet_ief_scaledown0005_arms_weighted2_bg_weighted_0point3_gamma2_600.hdf5',
+predict_autoencoder(256,
+                    64,
+                    32,
+                    'up-s31_64x64_resnet_ief_scaledown0005_arms_weighted2_bg_weighted_0point3_gamma2_600.hdf5',
                     save=True,
                     save_dir='./autoencoder_test/')
