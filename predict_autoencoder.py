@@ -38,20 +38,23 @@ def visualise_and_save(fname, padded_img, verts, projects, seg_maps, renderer, i
     plt.imshow(seg_maps[0])
     if save:
         plt.savefig(os.path.join(save_dir,
-                                 "{fname}_seg.png").format(fname=fname))
+                                 "{fname}_seg.png").format(fname=fname),
+                    bbox_inches='tight', pad_inches=0)
     plt.figure(2)
     plt.clf()
     plt.scatter(projects[0, :, 0], projects[0, :, 1], s=1)
     plt.gca().set_aspect('equal', adjustable='box')
     if save:
         plt.savefig(os.path.join(save_dir,
-                                 "{fname}_projects.png").format(fname=fname))
+                                 "{fname}_projects.png").format(fname=fname),
+                    bbox_inches='tight', pad_inches=0)
     plt.figure(3)
     rend_img = renderer(verts=verts[0], render_seg=False)
     plt.imshow(rend_img)
     if save:
         plt.savefig(os.path.join(save_dir,
-                                 "{fname}_rend.png").format(fname=fname))
+                                 "{fname}_rend.png").format(fname=fname),
+                    bbox_inches='tight', pad_inches=0)
     plt.figure(4)
     plt.clf()
     plt.imshow(padded_img)

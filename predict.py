@@ -33,6 +33,7 @@ def load_input_img(image_dir, fname, input_wh, pad=False):
 def visualise_and_save(fname, padded_img, verts, projects, seg_maps, renderer, input_wh,
                        output_wh, save=False, overlay_projects=False, save_dir=None):
     fname, _ = os.path.splitext(fname)
+    fname = fname[:5]  # for up-s31
     plt.figure(1)
     plt.clf()
     plt.imshow(seg_maps[0])
