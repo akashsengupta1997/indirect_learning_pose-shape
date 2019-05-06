@@ -4,6 +4,8 @@ An encoder-decoder model to solve 3D human pose and shape estimation WITHOUT req
 
 ![hello](network.jpg)
 
+The SMPL body model (http://smpl.is.tue.mpg.de) is used to parametrise 3D human pose and shape. The SMPL rendering function is implemented in tensorflow+keras - the implementation is heavily influenced by https://akanazawa.github.io/hmr/. 
+
 ## Example results
 ![](my_vid2_result.gif)
 
@@ -23,5 +25,6 @@ opendr
 
 ## Usage
 
-predict.py can be used to make new predictions from RGB image inputs. Simply change the filepath in the predict function call at the bottom of the script to a file path for a directory containing input images.
+predict.py can be used to make new predictions from RGB image inputs. Simply change the filepath in the predict function call at the bottom of the script to a file path for a directory containing input images. Unzip the provided weights file (in full_network_weights) and change the weights file name argument in the predict function call to the correct name. Then, simply run
+    python predict.py
 
