@@ -8,7 +8,8 @@ The SMPL body model (http://smpl.is.tue.mpg.de) is used to parametrise 3D human 
 
 ## Example results
 ![](my_vid2_result.gif)
-Please give the gif a few seconds to load!
+
+Please give the above gif a few seconds to load!
 
 ![](eg1.jpg)
 
