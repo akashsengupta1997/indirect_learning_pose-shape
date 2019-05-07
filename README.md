@@ -2,7 +2,7 @@
 
 An encoder-decoder model to solve 3D human pose and shape estimation WITHOUT requiring any 3D labelled data (i.e. without 3D joint labels/3D keypoint labels). The model outputs 31-body-part segmentations and obtains the desired 3D vertex mesh as an intermiedate step at the bottleneck of the auto-encoder.
 
-![hello](network.jpg)
+![](network.jpg)
 
 The SMPL body model (http://smpl.is.tue.mpg.de) is used to parametrise 3D human pose and shape. The SMPL rendering function is implemented in tensorflow+keras - the implementation is heavily influenced by https://akanazawa.github.io/hmr/. 
 
