@@ -69,8 +69,9 @@ def generate_data(image_generator, mask_generator, n, num_classes):
     return np.array(images), np.array(labels)
 
 
-def build_full_model_from_saved_model(smpl_model, output_wh, smpl_path, batch_size,
-                                      num_classes_segs, num_classes_silhs):
+def build_full_model_from_saved_model(smpl_model, segs_output_wh, silhs_output_wh,
+                                      smpl_path, batch_size, num_classes_segs,
+                                      num_classes_silhs):
     inp = smpl_model.input
     smpl = smpl_model.output
     verts = SMPLLayer(smpl_path, batch_size=batch_size)(smpl)
@@ -79,17 +80,17 @@ def build_full_model_from_saved_model(smpl_model, output_wh, smpl_path, batch_si
                                  name='project')([verts, smpl])
 
     silhouettes = Lambda(projects_to_silhouette,
-                         arguments={'img_wh': output_wh},
+                         arguments={'img_wh': silhs_output_wh},
                          name='segment_silh')(projects_with_depth)
-    silhouettes = Reshape((output_wh * output_wh, num_classes_silhs), name="final_reshape_silh")(silhouettes)
+    silhouettes = Reshape((silhs_output_wh * silhs_output_wh, num_classes_silhs), name="final_reshape_silh")(silhouettes)
     silhouettes = Activation('softmax', name="final_softmax_silh")(silhouettes)
 
     masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
     segs = Lambda(projects_to_seg,
-                  arguments={'img_wh': output_wh,
+                  arguments={'img_wh': segs_output_wh,
                              'vertex_sampling': None},
                   name='segment_bodyparts')([projects_with_depth, masks])
-    segs = Reshape((output_wh * output_wh, num_classes_segs), name="final_reshape_segs")(segs)
+    segs = Reshape((segs_output_wh * segs_output_wh, num_classes_segs), name="final_reshape_segs")(segs)
     segs = Activation('softmax', name="final_softmax_segs")(segs)
 
     verts_model = Model(inputs=inp, outputs=verts)
