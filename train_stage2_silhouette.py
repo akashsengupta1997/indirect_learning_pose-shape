@@ -168,7 +168,7 @@ def train(resume_from, input_wh, output_wh, save_model=False):
 
     adam_optimiser = Adam(lr=0.0001)
     silhouettes_model.compile(optimizer=adam_optimiser,
-                       loss=binary_focal_loss(gamma=1.0, weight_classes=True),
+                       loss='categorical_crossentropy',
                        metrics=['accuracy'])
 
     print("Model compiled.")
