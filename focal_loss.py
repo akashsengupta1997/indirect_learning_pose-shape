@@ -65,8 +65,8 @@ def binary_focal_loss(gamma=2.0, weight_classes=False):
         if weight_classes:
 
             weights = np.ones(2)
-            weights[0] = 0.3
-            weights[1] = 0.7
+            weights[0] = 0.5
+            weights[1] = 1.5
             weights = tf.constant(weights, dtype='float32')
             cross_entropy = tf.multiply(cross_entropy, weights)
             print("WEIGHTED BINARY LOSS")
