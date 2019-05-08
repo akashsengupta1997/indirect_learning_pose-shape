@@ -15,14 +15,16 @@ from keras.optimizers import Adam
 from keras.layers import Lambda, Reshape, Activation
 
 from keras_smpl.batch_smpl import SMPLLayer
-from keras_smpl.projection import persepective_project, orthographic_project2
+from keras_smpl.projection import orthographic_project2
 from keras_smpl.projects_to_silhouette import projects_to_silhouette
-from focal_loss import binary_focal_loss
+from keras_smpl.projects_to_seg import projects_to_seg
+from keras_smpl.compute_mask import compute_mask
+from focal_loss import categorical_focal_loss
 
 from renderer import SMPLRenderer
 
 
-def binary_classlab(labels, num_classes=2):
+def classlab(labels, num_classes):
     """
     Function to convert HxWx1 labels image to HxWxC one hot encoded matrix.
     :param labels: HxWx1 labels image
@@ -38,7 +40,7 @@ def binary_classlab(labels, num_classes=2):
     return x
 
 
-def generate_data(image_generator, mask_generator, n, num_classes=2):
+def generate_data(image_generator, mask_generator, n, num_classes):
     """
     Generate 1 batch of training data (batch_size = n) from given keras generators (made using
     flow_from_directory method).
@@ -59,7 +61,7 @@ def generate_data(image_generator, mask_generator, n, num_classes=2):
         j = 0
         while j < x.shape[0]:
             images.append(x[j, :, :, :])
-            labels.append(binary_classlab(y[j, :, :, :].astype(np.uint8), num_classes))
+            labels.append(classlab(y[j, :, :, :].astype(np.uint8), num_classes))
             j = j + 1
             i = i + 1
             if i >= n:
@@ -75,61 +77,100 @@ def build_full_model_from_saved_model(smpl_model, output_wh, smpl_path, batch_si
     projects_with_depth = Lambda(orthographic_project2,
                                  arguments={'vertex_sampling': None},
                                  name='project')([verts, smpl])
+
     silhouettes = Lambda(projects_to_silhouette,
                          arguments={'img_wh': output_wh},
-                         name='segment')(projects_with_depth)
-    silhouettes = Reshape((output_wh * output_wh, num_classes), name="final_reshape")(silhouettes)
-    silhouettes = Activation('softmax', name="final_softmax")(silhouettes)
+                         name='segment_silh')(projects_with_depth)
+    silhouettes = Reshape((output_wh * output_wh, num_classes), name="final_reshape_silh")(silhouettes)
+    silhouettes = Activation('softmax', name="final_softmax_silh")(silhouettes)
+
+    masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
+    segs = Lambda(projects_to_seg,
+                  arguments={'img_wh': output_wh,
+                             'vertex_sampling': None},
+                  name='segment_bodyparts')([projects_with_depth, masks])
+    segs = Reshape((output_wh * output_wh, num_classes), name="final_reshape_segs")(segs)
+    segs = Activation('softmax', name="final_softmax_segs")(segs)
 
     verts_model = Model(inputs=inp, outputs=verts)
     projects_model = Model(inputs=inp, outputs=projects_with_depth)
     silhouettes_model = Model(inputs=inp, outputs=silhouettes)
+    segs_model = Model(inputs=inp, outputs=segs)
 
     print(silhouettes_model.summary())
 
-    return verts_model, projects_model, silhouettes_model
+    return verts_model, projects_model, silhouettes_model, segs_model
 
 
-def train(resume_from, input_wh, output_wh, save_model=False):
+def train(resume_from, input_wh, segs_output_wh, silhs_output_wh, save_model=False, weight_segs_classes=True):
     batch_size = 4
-    train_image_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/upi-s1h/trial_images/"
-    train_label_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/upi-s1h/trial_masks/"
-    # train_image_dir = "/data/cvfs/as2562/4th_year_proj_datasets/upi-s1h/mpii_padded/images"
-    # train_label_dir = "/data/cvfs/as2562/4th_year_proj_datasets/upi-s1h/mpii_padded/masks"
-    monitor_dir = "./second_stage_monitor/monitor_train_images"
+    # train_image_dir_segs = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/images/"
+    # train_label_dir_segs = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks/"
+    # train_image_dir_silhs = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/upi-s1h/trial/images/"
+    # train_label_dir_silhs = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/upi-s1h/trial/masks/"
+    train_image_dir_segs = "/data/cvfs/as2562/4th_year_proj_datasets/s31_padded_small_glob_rot/images"
+    train_label_dir_segs = "/data/cvfs/as2562/4th_year_proj_datasets/s31_padded_small_glob_ro/masks"
+    train_image_dir_silhs = "/data/cvfs/as2562/4th_year_proj_datasets/upi-s1h/mpii_padded/images"
+    train_label_dir_silhs = "/data/cvfs/as2562/4th_year_proj_datasets/upi-s1h/mpii_padded/masks"
+
+    monitor_dir = "./second_stage_monitor2/monitor_train_images"
     # TODO create validation directory
-    num_classes = 2
-    num_train_images = 13030
+    num_classes_segs = 32
+    num_classes_silhs = 2
 
-    assert os.path.isdir(train_image_dir), 'Invalid image directory'
-    assert os.path.isdir(train_label_dir), 'Invalid label directory'
-    # assert os.path.isdir(val_image_dir), 'Invalid validation image directory'
-    # assert os.path.isdir(val_label_dir), 'Invalid validation label directory'
+    assert os.path.isdir(train_image_dir_segs), 'Invalid segs image directory'
+    assert os.path.isdir(train_label_dir_segs), 'Invalid segs label directory'
+    assert os.path.isdir(train_image_dir_silhs), 'Invalid silhs image directory'
+    assert os.path.isdir(train_label_dir_silhs), 'Invalid silhs label directory'
 
-    val_image_data_gen_args = dict(
-        rescale=(1/255.0),
-        fill_mode='nearest')
-
-    val_mask_data_gen_args = dict(
+    segs_image_data_gen_args = dict(
         rescale=(1 / 255.0),
         fill_mode='nearest')
 
-    train_image_datagen = ImageDataGenerator(**val_image_data_gen_args)
-    train_mask_datagen = ImageDataGenerator(**val_mask_data_gen_args)
+    segs_mask_data_gen_args = dict(
+        fill_mode='nearest')
+
+    silhs_image_data_gen_args = dict(
+        rescale=(1/255.0),
+        fill_mode='nearest')
+
+    silhs_mask_data_gen_args = dict(
+        rescale=(1 / 255.0),
+        fill_mode='nearest')
+
+    segs_image_datagen = ImageDataGenerator(**segs_image_data_gen_args)
+    segs_mask_datagen = ImageDataGenerator(**segs_mask_data_gen_args)
+    silhs_image_datagen = ImageDataGenerator(**silhs_image_data_gen_args)
+    silhs_mask_datagen = ImageDataGenerator(**silhs_mask_data_gen_args)
 
     # Provide the same seed to flow methods for train generators
     seed = 1
-    train_image_generator = train_image_datagen.flow_from_directory(
-        train_image_dir,
+    segs_image_generator = segs_image_datagen.flow_from_directory(
+        train_image_dir_segs,
         batch_size=batch_size,
         target_size=(input_wh, input_wh),
         class_mode=None,
         seed=seed)
 
-    train_mask_generator = train_mask_datagen.flow_from_directory(
-        train_label_dir,
+    segs_mask_generator = segs_mask_datagen.flow_from_directory(
+        train_label_dir_segs,
         batch_size=batch_size,
-        target_size=(output_wh, output_wh),
+        target_size=(segs_output_wh, segs_output_wh),
+        class_mode=None,
+        color_mode="grayscale",
+        seed=seed)
+
+    silhs_image_generator = silhs_image_datagen.flow_from_directory(
+        train_image_dir_silhs,
+        batch_size=batch_size,
+        target_size=(input_wh, input_wh),
+        class_mode=None,
+        seed=seed)
+
+    silhs_mask_generator = silhs_mask_datagen.flow_from_directory(
+        train_label_dir_silhs,
+        batch_size=batch_size,
+        target_size=(silhs_output_wh, silhs_output_wh),
         class_mode=None,
         color_mode="grayscale",
         seed=seed)
@@ -137,64 +178,97 @@ def train(resume_from, input_wh, output_wh, save_model=False):
     print('Generators loaded.')
 
     # # For testing data loading
-    # x = train_image_generator.next()
-    # y = train_mask_generator.next()
-    # print('x shape out of training generator', x.shape)  # should = (batch_size, img_hw, img_hw, 3)
-    # print('y shape out of training generator', y.shape)  # should = (batch_size, dec_hw, dec_hw, 1)
+    # x = segs_image_generator.next()
+    # y = segs_mask_generator.next()
     # plt.figure(1)
     # plt.subplot(221)
     # plt.imshow(x[0, :, :, :])
     # plt.subplot(222)
     # plt.imshow(y[0, :, :, 0])
-    # y_post = binary_classlab(y[0], num_classes)
+    # y_post = classlab(y[0], num_classes_segs)
+    # plt.subplot(223)
+    # plt.imshow(y_post[:, :, 0])
+    # plt.subplot(224)
+    # plt.imshow(y_post[:, :, 1])
+    # plt.show()
+    #
+    # x = silhs_image_generator.next()
+    # y = silhs_mask_generator.next()
+    # plt.figure(1)
+    # plt.subplot(221)
+    # plt.imshow(x[0, :, :, :])
+    # plt.subplot(222)
+    # plt.imshow(y[0, :, :, 0])
+    # y_post = classlab(y[0], num_classes_silhs)
     # plt.subplot(223)
     # plt.imshow(y_post[:, :, 0])
     # plt.subplot(224)
     # plt.imshow(y_post[:, :, 1])
     # plt.show()
 
-    print("Resuming model from ", resume_from)
+    print("Resuming from ", resume_from)
     smpl_model = load_model(os.path.join("./full_network_weights", resume_from),
                             custom_objects={'dd': dd,
                                             'tf': tf})
 
-    verts_model, projects_model, silhouettes_model = \
+    verts_model, projects_model, silhouettes_model, segs_model = \
         build_full_model_from_saved_model(smpl_model,
-                                          output_wh,
+                                          segs_output_wh,
                                           "./neutral_smpl_with_cocoplus_reg.pkl",
                                           batch_size,
-                                          num_classes)
-    print("Model loaded.")
+                                          num_classes_segs)
+    print("Models loaded.")
 
     adam_optimiser = Adam(lr=0.0001)
     silhouettes_model.compile(optimizer=adam_optimiser,
-                       loss='categorical_crossentropy',
-                       metrics=['accuracy'])
+                              loss='categorical_crossentropy',
+                              metrics=['accuracy'])
+    print("Silhouettes model compiled.")
 
-    print("Model compiled.")
+    segs_model.compile(optimizer=adam_optimiser,
+                       loss=categorical_focal_loss(gamma=2.0,
+                                                   weight_classes=weight_segs_classes),
+                       metrics=['accuracy'])
+    print("Segs model compiled.")
 
     for trial in range(4000):
         print("Fitting", trial)
 
-        def train_data_gen():
+        def segs_train_data_gen():
             while True:
-                train_data, train_labels = generate_data(train_image_generator,
-                                                         train_mask_generator,
+                train_data, train_labels = generate_data(segs_image_generator,
+                                                         segs_mask_generator,
                                                          batch_size,
-                                                         num_classes)
+                                                         num_classes_segs)
                 reshaped_train_labels = np.reshape(train_labels,
-                                                   (batch_size, output_wh * output_wh,
-                                                    num_classes))
+                                                   (batch_size, segs_output_wh * segs_output_wh,
+                                                    num_classes_segs))
                 yield (train_data, reshaped_train_labels)
 
-        history = silhouettes_model.fit_generator(train_data_gen(),
-                                                  steps_per_epoch=int((num_train_images/batch_size)/5),
-                                                  nb_epoch=1,
-                                                  verbose=1)
+        def silhs_train_data_gen():
+            while True:
+                train_data, train_labels = generate_data(silhs_image_generator,
+                                                         silhs_mask_generator,
+                                                         batch_size,
+                                                         num_classes_silhs)
+                reshaped_train_labels = np.reshape(train_labels,
+                                                   (batch_size, silhs_output_wh * silhs_output_wh,
+                                                    num_classes_silhs))
+                yield (train_data, reshaped_train_labels)
+
+        history_segs = segs_model.fit_generator(segs_train_data_gen(),
+                                                steps_per_epoch=300,
+                                                nb_epoch=1,
+                                                verbose=1)
+
+        history_silhs = silhouettes_model.fit_generator(silhs_train_data_gen(),
+                                                        steps_per_epoch=150,
+                                                        nb_epoch=1,
+                                                        verbose=1)
 
         renderer = SMPLRenderer()
 
-        if trial % 20 == 0:
+        if trial % 10 == 0:
             inputs = []
             for fname in sorted(os.listdir(monitor_dir)):
                 if fname.endswith(".png"):
@@ -213,21 +287,27 @@ def train(resume_from, input_wh, output_wh, save_model=False):
             smpls1 = smpl_model.predict(input_images_array1)
             verts1 = verts_model.predict(input_images_array1)
             projects1 = projects_model.predict(input_images_array1)
-            segs1 = np.reshape(silhouettes_model.predict(input_images_array1),
-                               [-1, output_wh, output_wh, num_classes])
+            segs1 = np.reshape(segs_model.predict(input_images_array1),
+                               [-1, segs_output_wh, segs_output_wh, num_classes_segs])
+            silhs1 = np.reshape(silhouettes_model.predict(input_images_array1),
+                                [-1, silhs_output_wh, silhs_output_wh, num_classes_silhs])
 
             smpls2 = smpl_model.predict(input_images_array2)
             verts2 = verts_model.predict(input_images_array2)
             projects2 = projects_model.predict(input_images_array2)
-            segs2 = np.reshape(silhouettes_model.predict(input_images_array2),
-                               [-1, output_wh, output_wh, num_classes])
+            segs2 = np.reshape(segs_model.predict(input_images_array2),
+                               [-1, segs_output_wh, segs_output_wh, num_classes_segs])
+            silhs2 = np.reshape(silhouettes_model.predict(input_images_array2),
+                                [-1, silhs_output_wh, silhs_output_wh, num_classes_silhs])
 
             smpls = np.concatenate((smpls1, smpls2), axis=0)
             verts = np.concatenate((verts1, verts2), axis=0)
             projects = np.concatenate((projects1, projects2), axis=0)
             segs = np.concatenate((segs1, segs2), axis=0)
+            silhs = np.concatenate((silhs1, silhs2), axis=0)
 
             seg_maps = np.argmax(segs, axis=-1)
+            silh_maps = np.argmax(silhs, axis=-1)
 
             print(smpls[0])
             for i in range(smpls.shape[0]):
@@ -237,10 +317,14 @@ def train(resume_from, input_wh, output_wh, save_model=False):
                 plt.savefig("./second_stage_monitor/seg_" + str(trial) + "_" + str(i) + ".png")
                 plt.figure(2)
                 plt.clf()
+                plt.imshow(silh_maps[i])
+                plt.savefig("./second_stage_monitor/silh_" + str(trial) + "_" + str(i) + ".png")
+                plt.figure(3)
+                plt.clf()
                 plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
                 plt.gca().set_aspect('equal', adjustable='box')
                 plt.savefig("./second_stage_monitor/verts_" + str(trial) + "_" + str(i) + ".png")
-                plt.figure(3)
+                plt.figure(4)
                 rend_img = renderer(verts=verts[i], render_seg=False)
                 plt.imshow(rend_img)
                 plt.savefig("./second_stage_monitor/rend_" + str(trial) + "_" + str(i) + ".png")
@@ -252,7 +336,7 @@ def train(resume_from, input_wh, output_wh, save_model=False):
                     plt.savefig("./second_stage_monitor/image_" + str(i) + ".png")
 
             if save_model:
-                save_fname = "second_stage_" + str(trial) + "_" + resume_from
+                save_fname = "second_stage48x48_combined_" + str(trial) + "_" + resume_from
                 smpl_model.save(os.path.join('./test_models', save_fname))
                 print('SAVE NAME', save_fname)
 
@@ -261,6 +345,7 @@ def train(resume_from, input_wh, output_wh, save_model=False):
 
 train("up-s31_48x48_resnet_ief_scaledown0005_arms_weighted_2_bg_weighted_0point3_gamma2_1630.hdf5",
       256,
-      96,
-      save_model=True)
+      48,
+      save_model=True,
+      weight_segs_classes=True)
 
