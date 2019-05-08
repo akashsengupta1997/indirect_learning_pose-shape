@@ -35,7 +35,7 @@ def categorical_focal_loss(gamma=2.0, weight_classes=False):
 
             weights[23] = 2.0
             weights[25] = 2.0
-            weights = tf.constant(weight_classes, dtype='float32')
+            weights = tf.constant(weights, dtype='float32')
             cross_entropy = tf.multiply(cross_entropy, weights)
             print("WEIGHTED LOSS")
 
