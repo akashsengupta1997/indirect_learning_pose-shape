@@ -57,9 +57,10 @@ def binary_focal_loss(gamma=2.0, weight_classes=False):
     """
 
     def binary_focal_loss_fixed(y_true, y_pred):
+        y_pred /= K.sum(y_pred, axis=-1, keepdims=True)
         epsilon = K.epsilon()
         y_pred = K.clip(y_pred, epsilon, 1. - epsilon)  # prevent Infs and NaNs by clipping
-        cross_entropy = -y_true * K.log(y_pred)  # (N, img_wh^2, 32)
+        cross_entropy = -y_true * K.log(y_pred)  # (N, img_wh^2, 2)
 
         if weight_classes:
 
