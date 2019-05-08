@@ -215,6 +215,7 @@ def train(resume_from, input_wh, segs_output_wh, silhs_output_wh, save_model=Fal
     verts_model, projects_model, silhouettes_model, segs_model = \
         build_full_model_from_saved_model(smpl_model,
                                           segs_output_wh,
+                                          silhs_output_wh,
                                           "./neutral_smpl_with_cocoplus_reg.pkl",
                                           batch_size,
                                           num_classes_segs,
