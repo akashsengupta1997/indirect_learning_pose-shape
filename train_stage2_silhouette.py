@@ -75,11 +75,9 @@ def build_full_model_from_saved_model(smpl_model, output_wh, smpl_path, batch_si
     projects_with_depth = Lambda(orthographic_project2,
                                  arguments={'vertex_sampling': None},
                                  name='project')([verts, smpl])
-    masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
     silhouettes = Lambda(projects_to_silhouette,
-                         arguments={'img_wh': output_wh,
-                                    'vertex_sampling': None},
-                         name='segment')([projects_with_depth, masks])
+                         arguments={'img_wh': output_wh},
+                         name='segment')(projects_with_depth)
     silhouettes = Reshape((output_wh * output_wh, num_classes), name="final_reshape")(silhouettes)
     silhouettes = Activation('softmax', name="final_softmax")(silhouettes)
 
