@@ -17,7 +17,7 @@ from keras.layers import Lambda, Reshape, Activation
 from keras_smpl.batch_smpl import SMPLLayer
 from keras_smpl.projection import persepective_project, orthographic_project2
 from keras_smpl.projects_to_silhouette import projects_to_silhouette
-from keras_smpl.compute_mask import compute_mask
+from focal_loss import binary_focal_loss
 
 from renderer import SMPLRenderer
 
@@ -168,7 +168,7 @@ def train(resume_from, input_wh, output_wh, save_model=False):
 
     adam_optimiser = Adam(lr=0.0001)
     silhouettes_model.compile(optimizer=adam_optimiser,
-                       loss='categorical_crossentropy',
+                       loss=binary_focal_loss(gamma=2.0, weight_classes=True),
                        metrics=['accuracy'])
 
     print("Model compiled.")
@@ -252,7 +252,7 @@ def train(resume_from, input_wh, output_wh, save_model=False):
                     plt.savefig("./second_stage_monitor/image_" + str(i) + ".png")
 
             if save_model:
-                save_fname = "second_stage_" + resume_from
+                save_fname = "second_stage_" + str(trial) + "_" + resume_from
                 smpl_model.save(os.path.join('./test_models', save_fname))
                 print('SAVE NAME', save_fname)
 
@@ -261,6 +261,6 @@ def train(resume_from, input_wh, output_wh, save_model=False):
 
 train("up-s31_48x48_resnet_ief_scaledown0005_arms_weighted_2_bg_weighted_0point3_gamma2_1630.hdf5",
       256,
-      64,
+      96,
       save_model=True)
 

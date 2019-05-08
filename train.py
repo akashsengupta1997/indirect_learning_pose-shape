@@ -267,7 +267,7 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
 
     adam_optimiser = Adam(lr=0.0001)
     segs_model.compile(optimizer=adam_optimiser,
-                       loss=categorical_focal_loss(gamma=5.0, weight_classes=weight_classes),
+                       loss=categorical_focal_loss(gamma=2.0, weight_classes=weight_classes),
                        metrics=['accuracy'])
 
     print("Model compiled.")
