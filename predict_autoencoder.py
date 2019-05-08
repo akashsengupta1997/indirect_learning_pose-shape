@@ -17,6 +17,7 @@ from keras_smpl.compute_mask import compute_mask
 from keras_smpl.projects_to_seg import projects_to_seg
 
 from renderer import SMPLRenderer
+from preprocessing import pad_image
 
 
 def load_input_seg(image_dir, fname, input_wh, num_classes):
@@ -101,7 +102,7 @@ def build_full_model(smpl_model, output_wh, smpl_path, batch_size=1):
 
 
 def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=False,
-                        save_dir=None, overlay_projects=True):
+                        save_dir=None, overlay_projects=True, pad_orig_img=True):
     test_image_dir = '/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks/train'
     orig_image_dir = '/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/images/train'
     renderer = SMPLRenderer()
@@ -125,6 +126,9 @@ def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=Fals
             orig_img = cv2.resize(orig_img, (input_wh, input_wh))
             orig_img = orig_img[..., ::-1]
             orig_img = orig_img * (1.0 / 255)
+
+            if pad_orig_img:
+                orig_img = pad_image(pad_orig_img)
 
             start = time.time()
             verts = verts_model.predict(input_seg)
