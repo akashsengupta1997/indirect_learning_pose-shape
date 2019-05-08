@@ -123,12 +123,11 @@ def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=Fals
             print(fname)
             input_seg = load_input_seg(test_image_dir, fname, input_wh, num_classes)
             orig_img = cv2.imread(os.path.join(orig_image_dir, fname[:5] + "_image.png"))
+            if pad_orig_img:
+                orig_img = pad_image(orig_img)
             orig_img = cv2.resize(orig_img, (input_wh, input_wh))
             orig_img = orig_img[..., ::-1]
             orig_img = orig_img * (1.0 / 255)
-
-            if pad_orig_img:
-                orig_img = pad_image(pad_orig_img)
 
             start = time.time()
             verts = verts_model.predict(input_seg)
