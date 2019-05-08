@@ -109,7 +109,7 @@ def train(resume_from, input_wh, segs_output_wh, silhs_output_wh, save_model=Fal
     # train_image_dir_silhs = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/upi-s1h/trial/images/"
     # train_label_dir_silhs = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/upi-s1h/trial/masks/"
     train_image_dir_segs = "/data/cvfs/as2562/4th_year_proj_datasets/s31_padded_small_glob_rot/images"
-    train_label_dir_segs = "/data/cvfs/as2562/4th_year_proj_datasets/s31_padded_small_glob_ro/masks"
+    train_label_dir_segs = "/data/cvfs/as2562/4th_year_proj_datasets/s31_padded_small_glob_rot/masks"
     train_image_dir_silhs = "/data/cvfs/as2562/4th_year_proj_datasets/upi-s1h/mpii_padded/images"
     train_label_dir_silhs = "/data/cvfs/as2562/4th_year_proj_datasets/upi-s1h/mpii_padded/masks"
 
@@ -345,6 +345,7 @@ def train(resume_from, input_wh, segs_output_wh, silhs_output_wh, save_model=Fal
 
 train("up-s31_48x48_resnet_ief_scaledown0005_arms_weighted_2_bg_weighted_0point3_gamma2_1630.hdf5",
       256,
+      48,
       48,
       save_model=True,
       weight_segs_classes=True)
