@@ -351,64 +351,64 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
             input_mask_array1 = input_mask_array[:batch_size, :, :, :]
             input_mask_array2 = input_mask_array[batch_size:, :, :, :]
 
-            smpls1 = smpl_model.predict(input_mask_array1)
-            verts1 = verts_model.predict(input_mask_array1)
-            projects1 = projects_model.predict(input_mask_array1)
-            segs1 = np.reshape(segs_model.predict(input_mask_array1),
-                               [-1, output_wh, output_wh, num_classes])
-
-            smpls2 = smpl_model.predict(input_mask_array2)
-            verts2 = verts_model.predict(input_mask_array2)
-            projects2 = projects_model.predict(input_mask_array2)
-            segs2 = np.reshape(segs_model.predict(input_mask_array2),
-                               [-1, output_wh, output_wh, num_classes])
-
-            smpls = np.concatenate((smpls1, smpls2), axis=0)
-            verts = np.concatenate((verts1, verts2), axis=0)
-            projects = np.concatenate((projects1, projects2), axis=0)
-            segs = np.concatenate((segs1, segs2), axis=0)
-
-            seg_maps = np.argmax(segs, axis=-1)
-
-            print(smpls[0])
-            # i = 0
-            # while i < batch_size:
-            for i in range(smpls.shape[0]):
-                plt.figure(1)
-                plt.clf()
-                plt.imshow(seg_maps[i])
-                plt.savefig("./monitor_train4/seg_" + str(trial) + "_" + str(i) + ".png")
-                plt.figure(2)
-                plt.clf()
-                plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
-                plt.gca().set_aspect('equal', adjustable='box')
-                plt.savefig("./monitor_train4/verts_" + str(trial) + "_" + str(i) + ".png")
-                plt.figure(3)
-                rend_img = renderer(verts=verts[i], render_seg=False)
-                plt.imshow(rend_img)
-                plt.savefig("./monitor_train4/rend_" + str(trial) + "_" + str(i) + ".png")
-
-                if trial == 0:
-                    plt.figure(4)
-                    plt.clf()
-                    plt.imshow(input_mask_array[i, :, :, 0])
-                    plt.savefig("./monitor_train4/gt_seg_" + str(i) + ".png")
-                # i += 1
-
-            if save_model:
-                save_fname = "{dataset}_{output_wh}x{output_wh}_resnet".format(dataset=dataset,
-                                                                               output_wh=output_wh)
-                if use_IEF:
-                    save_fname += "_ief"
-                save_fname += "_scaledown{scaledown}".format(
-                    scaledown=str(scaledown).replace('.', ''))
-                if vertex_sampling is not None:
-                    save_fname += "_vs{vertex_sampling}".format(vertex_sampling=vertex_sampling)
-                if weight_classes:
-                    save_fname += "_weighted"
-                save_fname += "_{trial}.hdf5".format(trial=trial)
-                smpl_model.save(os.path.join('./test_models', save_fname))
-                print('SAVE NAME', save_fname)
+            # smpls1 = smpl_model.predict(input_mask_array1)
+            # verts1 = verts_model.predict(input_mask_array1)
+            # projects1 = projects_model.predict(input_mask_array1)
+            # segs1 = np.reshape(segs_model.predict(input_mask_array1),
+            #                    [-1, output_wh, output_wh, num_classes])
+            #
+            # smpls2 = smpl_model.predict(input_mask_array2)
+            # verts2 = verts_model.predict(input_mask_array2)
+            # projects2 = projects_model.predict(input_mask_array2)
+            # segs2 = np.reshape(segs_model.predict(input_mask_array2),
+            #                    [-1, output_wh, output_wh, num_classes])
+            #
+            # smpls = np.concatenate((smpls1, smpls2), axis=0)
+            # verts = np.concatenate((verts1, verts2), axis=0)
+            # projects = np.concatenate((projects1, projects2), axis=0)
+            # segs = np.concatenate((segs1, segs2), axis=0)
+            #
+            # seg_maps = np.argmax(segs, axis=-1)
+            #
+            # print(smpls[0])
+            # # i = 0
+            # # while i < batch_size:
+            # for i in range(smpls.shape[0]):
+            #     plt.figure(1)
+            #     plt.clf()
+            #     plt.imshow(seg_maps[i])
+            #     plt.savefig("./monitor_train4/seg_" + str(trial) + "_" + str(i) + ".png")
+            #     plt.figure(2)
+            #     plt.clf()
+            #     plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
+            #     plt.gca().set_aspect('equal', adjustable='box')
+            #     plt.savefig("./monitor_train4/verts_" + str(trial) + "_" + str(i) + ".png")
+            #     plt.figure(3)
+            #     rend_img = renderer(verts=verts[i], render_seg=False)
+            #     plt.imshow(rend_img)
+            #     plt.savefig("./monitor_train4/rend_" + str(trial) + "_" + str(i) + ".png")
+            #
+            #     if trial == 0:
+            #         plt.figure(4)
+            #         plt.clf()
+            #         plt.imshow(input_mask_array[i, :, :, 0])
+            #         plt.savefig("./monitor_train4/gt_seg_" + str(i) + ".png")
+            #     # i += 1
+            #
+            # if save_model:
+            #     save_fname = "{dataset}_{output_wh}x{output_wh}_resnet".format(dataset=dataset,
+            #                                                                    output_wh=output_wh)
+            #     if use_IEF:
+            #         save_fname += "_ief"
+            #     save_fname += "_scaledown{scaledown}".format(
+            #         scaledown=str(scaledown).replace('.', ''))
+            #     if vertex_sampling is not None:
+            #         save_fname += "_vs{vertex_sampling}".format(vertex_sampling=vertex_sampling)
+            #     if weight_classes:
+            #         save_fname += "_weighted"
+            #     save_fname += "_{trial}.hdf5".format(trial=trial)
+            #     smpl_model.save(os.path.join('./test_models', save_fname))
+            #     print('SAVE NAME', save_fname)
 
 
 train(256, 64, 'up-s31', use_IEF=True, vertex_sampling=None, scaledown=0.005,
