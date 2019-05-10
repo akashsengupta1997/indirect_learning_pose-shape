@@ -165,6 +165,7 @@ def generate_data(input_mask_generator, output_mask_generator, n, num_classes):
         y = output_mask_generator.next()
         j = 0
         while j < y.shape[0]:
+            print(i, j)
             # input_labels.append(classlab(x[j, :, :, :].astype(np.uint8), num_classes))
             # fname = fnames[j]
             # id = fname[6:11]
@@ -177,13 +178,13 @@ def generate_data(input_mask_generator, output_mask_generator, n, num_classes):
             i = i + 1
             if i >= n:
                 break
-
+    print("Shape in generate_data", np.array(input_labels).shape, np.array(output_seg_labels).shape)
     return np.array(input_labels), np.array(output_seg_labels)
 
 
-def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_sampling=None,
+def train(input_wh, output_wh, dataset, num_gpus=1, use_IEF=False, vertex_sampling=None,
           scaledown=0.005, weight_classes=False, save_model=False, resume_from=None):
-    batch_size = 4
+    batch_size = 4 * num_gpus
 
     if dataset == 'up-s31':
         # train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
@@ -237,12 +238,12 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
         seed=seed)
 
     input_mask_generator = ImagesWithFnames(train_dir,
-                                                 train_input_mask_datagen,
-                                                 batch_size=batch_size,
-                                                 target_size=(input_wh, input_wh),
-                                                 class_mode=None,
-                                                 color_mode='grayscale',
-                                                 seed=seed)
+                                            train_input_mask_datagen,
+                                            batch_size=batch_size,
+                                            target_size=(input_wh, input_wh),
+                                            class_mode=None,
+                                            color_mode='grayscale',
+                                            seed=seed)
 
     print('Generators loaded.')
 
@@ -273,38 +274,32 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
         verts_model, projects_model, segs_model = build_full_model_from_saved_model(smpl_model,
                                                                                     output_wh,
                                                                                     "./neutral_smpl_with_cocoplus_reg.pkl",
-                                                                                    batch_size,
+                                                                                    batch_size / num_gpus,
                                                                                     num_classes)
         print("Model loaded.")
 
     else:
-        if multi_gpu:
-            segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
-                batch_size/2,
-                # (input_wh, input_wh, num_classes),
-                (input_wh, input_wh, 1),
-                "./neutral_smpl_with_cocoplus_reg.pkl",
-                output_wh,
-                num_classes)
-            parallel_segs_model = multi_gpu_model(segs_model, gpus=2)
-            parallel_segs_model.compile(optimizer=adam_optimiser,
-                                        loss=categorical_focal_loss(gamma=2.0),
-                                        metrics=['accuracy'])
-        else:
-            segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
-                batch_size,
-                (input_wh, input_wh, 1),
-                "./neutral_smpl_with_cocoplus_reg.pkl",
-                output_wh,
-                num_classes,
-                use_IEF=use_IEF,
-                vertex_sampling=vertex_sampling,
-                scaledown=scaledown)
+        segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
+            batch_size / num_gpus,
+            (input_wh, input_wh, 1),
+            "./neutral_smpl_with_cocoplus_reg.pkl",
+            output_wh,
+            num_classes,
+            use_IEF=use_IEF,
+            vertex_sampling=vertex_sampling,
+            scaledown=scaledown)
 
-    segs_model.compile(optimizer=adam_optimiser,
-                       loss=categorical_focal_loss(gamma=2.0,
-                                                   weight_classes=weight_classes),
-                       metrics=['accuracy'])
+    if num_gpus > 1:
+        parallel_segs_model = multi_gpu_model(segs_model, gpus=num_gpus)
+        parallel_segs_model.compile(optimizer=adam_optimiser,
+                                    loss=categorical_focal_loss(gamma=2.0,
+                                                                weight_classes=weight_classes),
+                                    metrics=['accuracy'])
+    elif num_gpus == 1:
+        segs_model.compile(optimizer=adam_optimiser,
+                           loss=categorical_focal_loss(gamma=2.0,
+                                                       weight_classes=weight_classes),
+                           metrics=['accuracy'])
 
     print("Model compiled.")
 
@@ -322,20 +317,20 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
                                                      num_classes))
                 yield (train_input_labels, reshaped_output_labels)
 
-        if multi_gpu:
+        if num_gpus > 1:
             history = parallel_segs_model.fit_generator(
                 train_data_gen(),
                 steps_per_epoch=10,
                 nb_epoch=1,
                 verbose=1)
-        else:
+        elif num_gpus == 1:
             history = segs_model.fit_generator(train_data_gen(),
                                                steps_per_epoch=int(num_train_images/batch_size),
                                                nb_epoch=1,
                                                verbose=1)
 
         renderer = SMPLRenderer()
-        if trial % 50 == 0:
+        if trial % 10 == 0:
 
             inputs = []
             for fname in sorted(os.listdir(monitor_dir)):
@@ -348,8 +343,8 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
                     inputs.append(input_labels)
 
             input_mask_array = np.array(inputs)
-            input_mask_array1 = input_mask_array[:batch_size/2, :, :, :]
-            input_mask_array2 = input_mask_array[batch_size/2:, :, :, :]
+            input_mask_array1 = input_mask_array[:batch_size/num_gpus, :, :, :]
+            input_mask_array2 = input_mask_array[batch_size/num_gpus:, :, :, :]
 
             smpls1 = smpl_model.predict(input_mask_array1)
             verts1 = verts_model.predict(input_mask_array1)
@@ -371,8 +366,6 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
             seg_maps = np.argmax(segs, axis=-1)
 
             print(smpls[0])
-            # i = 0
-            # while i < batch_size:
             for i in range(smpls.shape[0]):
                 plt.figure(1)
                 plt.clf()
