@@ -33,7 +33,7 @@ def load_input_img(image_dir, fname, input_wh, pad=False):
 def visualise_and_save(fname, padded_img, verts, projects, seg_maps, renderer, input_wh,
                        output_wh, save=False, overlay_projects=False, save_dir=None):
     fname, _ = os.path.splitext(fname)
-    fname = fname[:5]  # for up-s31
+    # fname = fname[:5]  # for up-s31
     plt.figure(1)
     plt.clf()
     plt.imshow(seg_maps[0])
@@ -140,11 +140,11 @@ def predict(test_image_dir, input_wh, output_wh, model_fname, save=False, save_d
             print("Average segmentation predict time:", np.mean(segs_pred_times))
 
 
-predict('/Users/Akash_Sengupta/Documents/4th_year_project_datasets/my_singleperson_data/imgs',
+predict('./results/my_singleperson_vids/full_network_test48x48/my_vid7/',
         256,
         48,
         'up-s31_48x48_resnet_ief_scaledown0005_arms_weighted_2_bg_weighted_0point3_gamma2_1630.hdf5',
         save=True,
-        save_dir='./results/my_singleperson_imgs/',
+        save_dir='./results/my_singleperson_vids/full_network_test48x48/my_vid7/',
         pad=True,
         overlay_projects=True)

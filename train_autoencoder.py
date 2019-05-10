@@ -189,7 +189,7 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
         # train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
         train_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded_small_glob_rot/masks"
         # val_dir = "/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks"
-        monitor_dir = "./monitor_train/monitor_train_images"
+        monitor_dir = "./monitor_train4/monitor_train_images"
         num_classes = 32
         num_train_images = 5932
         # num_train_images = 3
@@ -288,7 +288,7 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
                 num_classes)
             parallel_segs_model = multi_gpu_model(segs_model, gpus=2)
             parallel_segs_model.compile(optimizer=adam_optimiser,
-                                        loss=categorical_focal_loss(gamma=5.0),
+                                        loss=categorical_focal_loss(gamma=2.0),
                                         metrics=['accuracy'])
         else:
             segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
@@ -302,7 +302,7 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
                 scaledown=scaledown)
 
     segs_model.compile(optimizer=adam_optimiser,
-                       loss=categorical_focal_loss(gamma=5.0,
+                       loss=categorical_focal_loss(gamma=2.0,
                                                    weight_classes=weight_classes),
                        metrics=['accuracy'])
 
@@ -325,7 +325,7 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
         if multi_gpu:
             history = parallel_segs_model.fit_generator(
                 train_data_gen(),
-                steps_per_epoch=int(num_train_images/batch_size),
+                steps_per_epoch=10,
                 nb_epoch=1,
                 verbose=1)
         else:
@@ -377,22 +377,22 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
                 plt.figure(1)
                 plt.clf()
                 plt.imshow(seg_maps[i])
-                plt.savefig("./monitor_train/seg_" + str(trial) + "_" + str(i) + ".png")
+                plt.savefig("./monitor_train4/seg_" + str(trial) + "_" + str(i) + ".png")
                 plt.figure(2)
                 plt.clf()
                 plt.scatter(projects[i, :, 0], projects[i, :, 1], s=1)
                 plt.gca().set_aspect('equal', adjustable='box')
-                plt.savefig("./monitor_train/verts_" + str(trial) + "_" + str(i) + ".png")
+                plt.savefig("./monitor_train4/verts_" + str(trial) + "_" + str(i) + ".png")
                 plt.figure(3)
                 rend_img = renderer(verts=verts[i], render_seg=False)
                 plt.imshow(rend_img)
-                plt.savefig("./monitor_train/rend_" + str(trial) + "_" + str(i) + ".png")
+                plt.savefig("./monitor_train4/rend_" + str(trial) + "_" + str(i) + ".png")
 
                 if trial == 0:
                     plt.figure(4)
                     plt.clf()
                     plt.imshow(input_mask_array[i, :, :, 0])
-                    plt.savefig("./monitor_train/gt_seg_" + str(i) + ".png")
+                    plt.savefig("./monitor_train4/gt_seg_" + str(i) + ".png")
                 # i += 1
 
             if save_model:
@@ -411,5 +411,5 @@ def train(input_wh, output_wh, dataset, multi_gpu=False, use_IEF=False, vertex_s
                 print('SAVE NAME', save_fname)
 
 
-train(256, 96, 'up-s31', use_IEF=True, vertex_sampling=None, scaledown=0.005,
+train(256, 64, 'up-s31', use_IEF=True, vertex_sampling=None, scaledown=0.005,
       weight_classes=True, save_model=False, resume_from=None)

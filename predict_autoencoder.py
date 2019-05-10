@@ -33,7 +33,7 @@ def load_input_seg(image_dir, fname, input_wh, num_classes):
 def visualise_and_save(fname, padded_img, verts, projects, seg_maps, renderer, input_wh,
                        output_wh, save=False, save_dir=None, overlay_projects=False):
     fname, _ = os.path.splitext(fname)
-    fname = fname[:5]
+    # fname = fname[:5]
     plt.figure(1)
     plt.clf()
     plt.imshow(seg_maps[0])
@@ -103,8 +103,8 @@ def build_full_model(smpl_model, output_wh, smpl_path, batch_size=1):
 
 def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=False,
                         save_dir=None, overlay_projects=True, pad_orig_img=True):
-    test_image_dir = '/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/masks/train'
-    orig_image_dir = '/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/trial/images/train'
+    test_image_dir = './results/my_singleperson_vids/autoencoder_test48x48/my_vid7'
+    orig_image_dir = './results/my_singleperson_imgs/fat_people/'
     renderer = SMPLRenderer()
     smpl_model = load_model(os.path.join("./autoencoder_weights", model_fname),
                             custom_objects={'dd': dd,
@@ -122,7 +122,7 @@ def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=Fals
         if fname.endswith(".png"):
             print(fname)
             input_seg = load_input_seg(test_image_dir, fname, input_wh, num_classes)
-            orig_img = cv2.imread(os.path.join(orig_image_dir, fname[:5] + "_image.png"))
+            orig_img = cv2.imread(os.path.join(orig_image_dir, fname[:7] + "_image.png"))
             if pad_orig_img:
                 orig_img = pad_image(orig_img)
             orig_img = cv2.resize(orig_img, (input_wh, input_wh))
@@ -148,8 +148,8 @@ def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=Fals
 
 
 predict_autoencoder(256,
-                    64,
+                    48,
                     32,
-                    'up-s31_64x64_resnet_ief_scaledown0005_arms_weighted2_bg_weighted_0point3_gamma2_600.hdf5',
+                    'up-s31_48x48_resnet_ief_scaledown0005_arms_weighted2_bg_weighted_0point3_gamma2_690.hdf5',
                     save=True,
-                    save_dir='./autoencoder_test/')
+                    save_dir='./results/my_singleperson_vids/autoencoder_test48x48/my_vid7')
