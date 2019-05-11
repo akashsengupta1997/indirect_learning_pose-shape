@@ -32,6 +32,7 @@ def concat_mean_param(img_features, img_wh):
     mean = tf.tile(mean, [K.shape(img_features)[0], 1])
 
     state = tf.concat([img_features, mean], axis=1)
-    return [state, mean]
+    #return [state, mean]
+    return state
 
 # concat_mean_param(None)

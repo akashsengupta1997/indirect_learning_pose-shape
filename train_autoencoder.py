@@ -57,8 +57,13 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_wh, num_c
         IEF_layer_3 = Dense(num_total_params, activation='linear', name='IEF_layer_3')
 
         # Load mean params and set initial state to concatenation of image features and mean params
-        state1, param1 = Lambda(concat_mean_param,
-                                arguments={'img_wh': output_wh})(img_features)
+        # state1, param1 = Lambda(concat_mean_param,
+        #                         arguments={'img_wh': output_wh})(img_features)
+        state1 = Lambda(concat_mean_param,
+                        arguments={'img_wh': output_wh})(img_features)
+        param1 = state1[:, 2048:]
+        print("State1 shape", state1.get_shape())
+        print("Param1 shape", param1.get_shape())
 
         # Iteration 1
         delta1 = IEF_layer_1(state1)
