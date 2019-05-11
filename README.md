@@ -15,7 +15,7 @@ Please give the above gif a few seconds to load!
 
 ![](eg2.jpg)
 
-Left to right: Input image, (ground truth segmentation - for still images above), 3D body model rendering, Locations of (projected) predicted vertices relative to input image, body-part segmentation (network output).
+Clockwise: Input image, (ground truth segmentation - for still images above), 3D body model rendering, 31 Body-part segmentation (network output), Locations of (projected) predicted vertices relative to input image.
 
 ## Requirements
 
