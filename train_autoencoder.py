@@ -61,7 +61,7 @@ def build_autoencoder(train_batch_size, input_shape, smpl_path, output_wh, num_c
         #                         arguments={'img_wh': output_wh})(img_features)
         state1 = Lambda(concat_mean_param,
                         arguments={'img_wh': output_wh})(img_features)
-        param1 = state1[:, 2048:]
+        param1 = Lambda(lambda x: x[:, 2048:])(state1)
         print("State1 shape", state1.get_shape())
         print("Param1 shape", param1.get_shape())
 
