@@ -82,20 +82,20 @@ def train(input_wh, output_wh, dataset, num_gpus=1, use_IEF=False, vertex_sampli
 
     train_image_data_gen_args = dict(
         rotation_range=10,
-        width_shift_range=0.0,
-        height_shift_range=0.0,
-        shear_range=0.1,
-        zoom_range=0.1,
+        width_shift_range=0.05,
+        height_shift_range=0.05,
+        shear_range=0.15,
+        zoom_range=0.15,
         horizontal_flip=False,
         rescale=1/255.0,
         fill_mode='nearest')
 
     train_mask_data_gen_args = dict(
         rotation_range=10,
-        width_shift_range=0.0,
-        height_shift_range=0.0,
-        shear_range=0.1,
-        zoom_range=0.1,
+        width_shift_range=0.05,
+        height_shift_range=0.05,
+        shear_range=0.15,
+        zoom_range=0.15,
         horizontal_flip=False,
         fill_mode='nearest')
 
@@ -160,7 +160,7 @@ def train(input_wh, output_wh, dataset, num_gpus=1, use_IEF=False, vertex_sampli
     # plt.subplot(223)
     # plt.imshow(y_post[:, :, 0])
     # plt.subplot(224)
-    # plt.imshow(y_post[:, :, 13])
+    # plt.imshow(y_post[:, :, 28])
     # plt.show()
 
     adam_optimiser = Adam(lr=0.0001)
