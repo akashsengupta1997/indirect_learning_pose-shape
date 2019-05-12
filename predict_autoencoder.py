@@ -12,7 +12,7 @@ from keras.models import Model, load_model
 from keras.layers import Lambda
 
 from keras_smpl.batch_smpl import SMPLLayer
-from keras_smpl.projection import orthographic_project2
+from keras_smpl.projection import orthographic_project
 from keras_smpl.compute_mask import compute_mask
 from keras_smpl.projects_to_seg import projects_to_seg
 
@@ -85,7 +85,7 @@ def build_full_model(smpl_model, output_wh, smpl_path, batch_size=1):
     inp = smpl_model.input
     smpl = smpl_model.output
     verts = SMPLLayer(smpl_path, batch_size=batch_size)(smpl)
-    projects_with_depth = Lambda(orthographic_project2,
+    projects_with_depth = Lambda(orthographic_project,
                                  arguments={'vertex_sampling': None},
                                  name='project')([verts, smpl])
     masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
@@ -103,8 +103,8 @@ def build_full_model(smpl_model, output_wh, smpl_path, batch_size=1):
 
 def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=False,
                         save_dir=None, overlay_projects=True, pad_orig_img=True):
-    test_image_dir = './results/my_singleperson_vids/autoencoder_test48x48/my_vid7'
-    orig_image_dir = './results/my_singleperson_imgs/fat_people/'
+    test_image_dir = '/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded_small_glob_rot/val_masks/val'
+    orig_image_dir = '/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded_small_glob_rot/val_images/val'
     renderer = SMPLRenderer()
     smpl_model = load_model(os.path.join("./autoencoder_weights", model_fname),
                             custom_objects={'dd': dd,
@@ -122,7 +122,7 @@ def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=Fals
         if fname.endswith(".png"):
             print(fname)
             input_seg = load_input_seg(test_image_dir, fname, input_wh, num_classes)
-            orig_img = cv2.imread(os.path.join(orig_image_dir, fname[:7] + "_image.png"))
+            orig_img = cv2.imread(os.path.join(orig_image_dir, fname[:5] + "_image.png"))
             if pad_orig_img:
                 orig_img = pad_image(orig_img)
             orig_img = cv2.resize(orig_img, (input_wh, input_wh))
@@ -150,6 +150,7 @@ def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=Fals
 predict_autoencoder(256,
                     48,
                     32,
-                    'up-s31_48x48_resnet_ief_scaledown0005_arms_weighted2_bg_weighted_0point3_gamma2_690.hdf5',
-                    save=True,
-                    save_dir='./results/my_singleperson_vids/autoencoder_test48x48/my_vid7')
+                    'up-s31_48x48_resnet_ief_scaledown0005_arms_weighted2_bg_weighted_0point3_gamma2_multigpu_350.hdf5',
+                    save=False,
+                    save_dir=None,
+                    pad_orig_img=False)

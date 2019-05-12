@@ -15,7 +15,7 @@ from keras.optimizers import Adam
 from keras.layers import Lambda, Reshape, Activation
 
 from keras_smpl.batch_smpl import SMPLLayer
-from keras_smpl.projection import orthographic_project2
+from keras_smpl.projection import orthographic_project
 from keras_smpl.projects_to_silhouette import projects_to_silhouette
 from keras_smpl.projects_to_seg import projects_to_seg
 from keras_smpl.compute_mask import compute_mask
@@ -75,7 +75,7 @@ def build_full_model_from_saved_model(smpl_model, segs_output_wh, silhs_output_w
     inp = smpl_model.input
     smpl = smpl_model.output
     verts = SMPLLayer(smpl_path, batch_size=batch_size)(smpl)
-    projects_with_depth = Lambda(orthographic_project2,
+    projects_with_depth = Lambda(orthographic_project,
                                  arguments={'vertex_sampling': None},
                                  name='project')([verts, smpl])
 

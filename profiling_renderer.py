@@ -5,7 +5,7 @@ from keras.models import Model
 
 from keras_smpl.batch_smpl import SMPLLayer
 from keras_smpl.projection import persepective_project, orthographic_project, \
-    orthographic_project2
+    orthographic_project
 from keras_smpl.projects_to_seg import projects_to_seg
 from keras_smpl.set_cam_params import set_cam_params
 from keras_smpl.compute_mask import compute_mask

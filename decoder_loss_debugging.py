@@ -10,7 +10,7 @@ from keras.optimizers import Adam
 
 from keras_smpl.batch_smpl import SMPLLayer
 from keras_smpl.projection import persepective_project, orthographic_project, \
-    orthographic_project2
+    orthographic_project
 from keras_smpl.projects_to_seg import projects_to_seg
 from keras_smpl.set_cam_params import set_cam_params, load_mean_set_cam_params
 from keras_smpl.compute_mask import compute_mask
@@ -80,7 +80,7 @@ def build_debug_model(batch_size, smpl_path, output_img_wh, num_classes, vertex_
     smpls = Lambda(load_mean_set_cam_params, arguments={'img_wh': output_img_wh})(smpls)
 
     verts = SMPLLayer(smpl_path, batch_size=batch_size)(smpls)
-    projects_with_depth = Lambda(orthographic_project2,
+    projects_with_depth = Lambda(orthographic_project,
                                  arguments={"vertex_sampling": vertex_sampling},
                                  name='projection')([verts, smpls])
     masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)

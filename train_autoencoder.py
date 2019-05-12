@@ -5,142 +5,18 @@ import cv2
 from matplotlib import pyplot as plt
 import deepdish as dd
 
-from keras.models import Model, load_model
-from keras.layers import Input, Dense, Lambda, Reshape, Conv2D, MaxPooling2D, \
-    BatchNormalization, Activation, Add, Concatenate
+from keras.models import load_model
 from keras.preprocessing.image import ImageDataGenerator
-from keras.applications import resnet50
 from keras.optimizers import Adam
 from keras.utils import multi_gpu_model
 
-from keras_smpl.batch_smpl import SMPLLayer
-from keras_smpl.projection import persepective_project, orthographic_project2
-from keras_smpl.projects_to_seg import projects_to_seg
-from keras_smpl.concat_mean_param import concat_mean_param
-from keras_smpl.set_cam_params import load_mean_set_cam_params
-from keras_smpl.compute_mask import compute_mask
-from keras_smpl.compute_mask_batch_map_only import compute_mask_batch_map_only
-from keras_smpl.compute_mask_without_map import compute_mask_without_map
-
 from generators.image_generator_with_fname import ImagesWithFnames
 
-from encoders.encoder_enet_simple import build_enet
 from renderer import SMPLRenderer
 
 from focal_loss import categorical_focal_loss
 
-
-def build_autoencoder(train_batch_size, input_shape, smpl_path, output_wh, num_classes,
-                      encoder_architecture='resnet50', use_IEF=False, vertex_sampling=None,
-                      scaledown=0.005):
-    num_camera_params = 4
-    num_smpl_params = 72 + 10
-    num_total_params = num_smpl_params + num_camera_params
-
-    # --- BACKBONE ---
-    if encoder_architecture == 'enet':
-        inp = Input(shape=input_shape)
-        img_features = build_enet(inp)  # (N, 32, 32, 128) output size from enet
-        # TODO add layers to get to (N, 2048) size
-
-    elif encoder_architecture == 'resnet50':
-        resnet = resnet50.ResNet50(include_top=False, weights=None, input_shape=input_shape)
-        inp = resnet.input
-        img_features = resnet.output
-        img_features = Reshape((2048,))(img_features)
-
-    if use_IEF:
-        # --- IEF MODULE ---
-        # Instantiate ief layers
-        IEF_layer_1 = Dense(1024, activation='relu', name='IEF_layer_1')
-        IEF_layer_2 = Dense(1024, activation='relu', name='IEF_layer_2')
-        IEF_layer_3 = Dense(num_total_params, activation='linear', name='IEF_layer_3')
-
-        # Load mean params and set initial state to concatenation of image features and mean params
-        # state1, param1 = Lambda(concat_mean_param,
-        #                         arguments={'img_wh': output_wh})(img_features)
-        state1 = Lambda(concat_mean_param,
-                        arguments={'img_wh': output_wh})(img_features)
-        param1 = Lambda(lambda x: x[:, 2048:])(state1)
-        print("State1 shape", state1.get_shape())
-        print("Param1 shape", param1.get_shape())
-
-        # Iteration 1
-        delta1 = IEF_layer_1(state1)
-        delta1 = IEF_layer_2(delta1)
-        delta1 = IEF_layer_3(delta1)
-        delta1 = Lambda(lambda x, d: x * d, arguments={"d": scaledown})(delta1)
-        param2 = Add()([param1, delta1])
-        state2 = Concatenate()([img_features, param2])
-
-        # Iteration 2
-        delta2 = IEF_layer_1(state2)
-        delta2 = IEF_layer_2(delta2)
-        delta2 = IEF_layer_3(delta2)
-        delta2 = Lambda(lambda x, d: x * d, arguments={"d": scaledown})(delta2)
-        param3 = Add()([param2, delta2])
-        state3 = Concatenate()([img_features, param3])
-
-        # Iteration 3
-        delta3 = IEF_layer_1(state3)
-        delta3 = IEF_layer_2(delta3)
-        delta3 = IEF_layer_3(delta3)
-        delta3 = Lambda(lambda x, d: x * d, arguments={"d": scaledown})(delta3)
-        final_param = Add()([param3, delta3])
-
-    else:
-        smpl = Dense(2048, activation='relu')(img_features)
-        smpl = Dense(1024, activation='relu')(smpl)
-        smpl = Dense(num_total_params, activation='linear')(smpl)
-        smpl = Lambda(lambda x: x * scaledown, name="scale_down")(smpl)
-        final_param = Lambda(load_mean_set_cam_params,
-                             arguments={'img_wh': output_wh})(smpl)
-
-    verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
-    projects_with_depth = Lambda(orthographic_project2,
-                                 arguments={'vertex_sampling': vertex_sampling},
-                                 name='project')([verts, final_param])
-    masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
-    # masks = Lambda(compute_mask_batch_map_only, name='compute_mask')(projects_with_depth)
-    # masks = Lambda(compute_mask_without_map, name='compute_mask')(projects_with_depth)
-    segs = Lambda(projects_to_seg,
-                  arguments={'img_wh': output_wh,
-                             'vertex_sampling': vertex_sampling},
-                  name='segment')([projects_with_depth, masks])
-    segs = Reshape((output_wh * output_wh, num_classes), name="final_reshape")(segs)
-    segs = Activation('softmax', name="final_softmax")(segs)
-
-    segs_model = Model(inputs=inp, outputs=segs)
-    smpl_model = Model(inputs=inp, outputs=final_param)
-    verts_model = Model(inputs=inp, outputs=verts)
-    projects_model = Model(inputs=inp, outputs=projects_with_depth)
-
-    print(segs_model.summary())
-
-    return segs_model, smpl_model, verts_model, projects_model
-
-
-def build_full_model_from_saved_model(smpl_model, output_wh, smpl_path, batch_size,
-                                      num_classes):
-    inp = smpl_model.input
-    smpl = smpl_model.output
-    verts = SMPLLayer(smpl_path, batch_size=batch_size)(smpl)
-    projects_with_depth = Lambda(orthographic_project2,
-                                 arguments={'vertex_sampling': None},
-                                 name='project')([verts, smpl])
-    masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
-    segs = Lambda(projects_to_seg,
-                  arguments={'img_wh': output_wh,
-                             'vertex_sampling': None},
-                  name='segment')([projects_with_depth, masks])
-    segs = Reshape((output_wh * output_wh, num_classes), name="final_reshape")(segs)
-    segs = Activation('softmax', name="final_softmax")(segs)
-
-    verts_model = Model(inputs=inp, outputs=verts)
-    projects_model = Model(inputs=inp, outputs=projects_with_depth)
-    segs_model = Model(inputs=inp, outputs=segs)
-
-    return verts_model, projects_model, segs_model
+from model import build_model, build_full_model_from_saved_model
 
 
 def classlab(labels, num_classes):
@@ -272,7 +148,7 @@ def train(input_wh, output_wh, dataset, num_gpus=1, use_IEF=False, vertex_sampli
 
     if resume_from is not None:
         print("Resuming model from ", resume_from)
-        smpl_model = load_model(os.path.join("./test_models", resume_from),
+        smpl_model = load_model(os.path.join("./autoencoder_models", resume_from),
                                 custom_objects={'dd': dd,
                                                 'tf': tf})
 
@@ -284,13 +160,13 @@ def train(input_wh, output_wh, dataset, num_gpus=1, use_IEF=False, vertex_sampli
         print("Model loaded.")
 
     else:
-        segs_model, smpl_model, verts_model, projects_model = build_autoencoder(
+        segs_model, smpl_model, verts_model, projects_model = build_model(
             batch_size / num_gpus,
             (input_wh, input_wh, 1),
             "./neutral_smpl_with_cocoplus_reg.pkl",
             output_wh,
             num_classes,
-            use_IEF=False,
+            use_IEF=use_IEF,
             vertex_sampling=vertex_sampling,
             scaledown=scaledown)
 
@@ -323,14 +199,13 @@ def train(input_wh, output_wh, dataset, num_gpus=1, use_IEF=False, vertex_sampli
                 yield (train_input_labels, reshaped_output_labels)
 
         if num_gpus > 1:
-            history = parallel_segs_model.fit_generator(
-                train_data_gen(),
-                steps_per_epoch=10,
-                nb_epoch=1,
-                verbose=1)
+            history = parallel_segs_model.fit_generator(train_data_gen(),
+                                                        steps_per_epoch=int(num_train_images/(batch_size*5)),
+                                                        nb_epoch=1,
+                                                        verbose=1)
         elif num_gpus == 1:
             history = segs_model.fit_generator(train_data_gen(),
-                                               steps_per_epoch=int(num_train_images/batch_size),
+                                               steps_per_epoch=int(num_train_images/(batch_size*5)),
                                                nb_epoch=1,
                                                verbose=1)
 
@@ -391,7 +266,6 @@ def train(input_wh, output_wh, dataset, num_gpus=1, use_IEF=False, vertex_sampli
                     plt.clf()
                     plt.imshow(input_mask_array[i, :, :, 0])
                     plt.savefig("./monitor_train4/gt_seg_" + str(i) + ".png")
-                # i += 1
 
             if save_model:
                 save_fname = "{dataset}_{output_wh}x{output_wh}_resnet".format(dataset=dataset,
@@ -403,9 +277,9 @@ def train(input_wh, output_wh, dataset, num_gpus=1, use_IEF=False, vertex_sampli
                 if vertex_sampling is not None:
                     save_fname += "_vs{vertex_sampling}".format(vertex_sampling=vertex_sampling)
                 if weight_classes:
-                    save_fname += "_weighted"
+                    save_fname += "_arms_weighted_2_bg_weighted_0point3_gamma2_multigpu"
                 save_fname += "_{trial}.hdf5".format(trial=trial)
-                smpl_model.save(os.path.join('./test_models', save_fname))
+                smpl_model.save(os.path.join('./autoencoder_models', save_fname))
                 print('SAVE NAME', save_fname)
 
 

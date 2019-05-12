@@ -50,38 +50,7 @@ def persepective_project(verts):
     return project_coords
 
 
-def orthographic_project(verts):
-    """
-
-    :param verts:
-    :return:
-    """
-    img_wh = 64
-    k_u = 32.0
-    k_v = 32.0
-    u0 = img_wh / 2.0
-    v0 = img_wh / 2.0 + 10
-
-    k_u = tf.constant(k_u, dtype='float32')
-    k_v = tf.constant(k_v, dtype='float32')
-    u0 = tf.constant(u0, dtype='float32')
-    v0 = tf.constant(v0, dtype='float32')
-
-    # T1 = tf.expand_dims(tf.constant(0.0), axis=0)
-    # T2 = tf.expand_dims(tf.constant(0.0), axis=0)
-    # T = tf.stack([T1, T2], axis=1)
-    # T = tf.expand_dims(T, axis=1)
-
-    x_proj = verts[:, :, 0]
-    y_proj = verts[:, :, 1]
-    u = tf.add(u0, tf.scalar_mul(k_u, x_proj))
-    v = tf.add(v0, tf.scalar_mul(k_v, y_proj))
-    project_coords = tf.stack([u, v], axis=2)
-
-    return project_coords
-
-
-def orthographic_project2(inputs, vertex_sampling):
+def orthographic_project(inputs, vertex_sampling):
     """
 
     :param verts:

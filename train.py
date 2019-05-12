@@ -2,109 +2,17 @@ import numpy as np
 import os
 import cv2
 from matplotlib import pyplot as plt
+import deepdish as dd
 
 import tensorflow as tf
-from keras import backend as K
-from keras.models import Model
-from keras.layers import Input, Dense, Lambda, Reshape, Conv2D, MaxPooling2D, \
-    BatchNormalization, Activation, Add, Concatenate
+from keras.models import load_model
 from keras.preprocessing.image import ImageDataGenerator
-from keras.applications import resnet50
 from keras.optimizers import Adam
+from keras.utils import multi_gpu_model
 
-from keras_smpl.batch_smpl import SMPLLayer
-from keras_smpl.projection import persepective_project, orthographic_project2
-from keras_smpl.projects_to_seg import projects_to_seg
-from keras_smpl.concat_mean_param import concat_mean_param
-from keras_smpl.set_cam_params import load_mean_set_cam_params
-from keras_smpl.compute_mask import compute_mask
-
-from encoders.encoder_enet_simple import build_enet
 from renderer import SMPLRenderer
-
+from model import build_model, build_full_model_from_saved_model
 from focal_loss import categorical_focal_loss
-
-
-def build_model(train_batch_size, input_shape, smpl_path, output_wh, num_classes,
-                encoder_architecture='resnet50', use_IEF=False, vertex_sampling=None,
-                scaledown=0.005):
-    num_camera_params = 4
-    num_smpl_params = 72 + 10
-    num_total_params = num_smpl_params + num_camera_params
-
-    # --- BACKBONE ---
-    if encoder_architecture == 'enet':
-        inp = Input(shape=input_shape)
-        img_features = build_enet(inp)  # (N, 32, 32, 128) output size from enet
-
-    elif encoder_architecture == 'resnet50':
-        resnet = resnet50.ResNet50(include_top=False, weights=None, input_shape=input_shape)
-        inp = resnet.input
-        img_features = resnet.output
-        img_features = Reshape((2048,))(img_features)
-
-    if use_IEF:
-        # --- IEF MODULE ---
-        # Instantiate ief layers
-        IEF_layer_1 = Dense(1024, activation='relu', name='IEF_layer_1')
-        IEF_layer_2 = Dense(1024, activation='relu', name='IEF_layer_2')
-        IEF_layer_3 = Dense(num_total_params, activation='linear', name='IEF_layer_3')
-
-        # Load mean params and set initial state to concatenation of image features and mean params
-        state1, param1 = Lambda(concat_mean_param,
-                                arguments={'img_wh': output_wh})(img_features)
-
-        # Iteration 1
-        delta1 = IEF_layer_1(state1)
-        delta1 = IEF_layer_2(delta1)
-        delta1 = IEF_layer_3(delta1)
-        delta1 = Lambda(lambda x, d: x * d, arguments={"d": scaledown})(delta1)
-        param2 = Add()([param1, delta1])
-        state2 = Concatenate()([img_features, param2])
-
-        # Iteration 2
-        delta2 = IEF_layer_1(state2)
-        delta2 = IEF_layer_2(delta2)
-        delta2 = IEF_layer_3(delta2)
-        delta2 = Lambda(lambda x, d: x * d, arguments={"d": scaledown})(delta2)
-        param3 = Add()([param2, delta2])
-        state3 = Concatenate()([img_features, param3])
-
-        # Iteration 3
-        delta3 = IEF_layer_1(state3)
-        delta3 = IEF_layer_2(delta3)
-        delta3 = IEF_layer_3(delta3)
-        delta3 = Lambda(lambda x, d: x * d, arguments={"d": scaledown})(delta3)
-        final_param = Add()([param3, delta3])
-
-    else:
-        smpl = Dense(2048, activation='relu')(img_features)
-        smpl = Dense(1024, activation='relu')(smpl)
-        smpl = Dense(num_total_params, activation='linear')(smpl)
-        smpl = Lambda(lambda x: x * scaledown, name="scale_down")(smpl)
-        final_param = Lambda(load_mean_set_cam_params,
-                             arguments={'img_wh': output_wh})(smpl)
-
-    verts = SMPLLayer(smpl_path, batch_size=train_batch_size)(final_param)
-    projects_with_depth = Lambda(orthographic_project2,
-                                 arguments={'vertex_sampling': vertex_sampling},
-                                 name='project')([verts, final_param])
-    masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
-    segs = Lambda(projects_to_seg,
-                  arguments={'img_wh': output_wh,
-                             'vertex_sampling': vertex_sampling},
-                  name='segment')([projects_with_depth, masks])
-    segs = Reshape((output_wh * output_wh, num_classes))(segs)
-    segs = Activation('softmax')(segs)
-
-    segs_model = Model(inputs=inp, outputs=segs)
-    smpl_model = Model(inputs=inp, outputs=final_param)
-    verts_model = Model(inputs=inp, outputs=verts)
-    projects_model = Model(inputs=inp, outputs=projects_with_depth)
-
-    print(segs_model.summary())
-
-    return segs_model, smpl_model, verts_model, projects_model
 
 
 def classlab(labels, num_classes):
@@ -153,9 +61,9 @@ def generate_data(image_generator, mask_generator, n, num_classes):
     return np.array(images), np.array(labels)
 
 
-def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
-          scaledown=0.005, weight_classes=False, save_model=False):
-    batch_size = 4
+def train(input_wh, output_wh, dataset, num_gpus=1, use_IEF=False, vertex_sampling=None,
+          scaledown=0.005, weight_classes=False, save_model=False, resume_from=None):
+    batch_size = 4 * num_gpus
 
     if dataset == 'up-s31':
         # train_image_dir = "/data/cvfs/as2562/4th_year_proj_datasets/s31_padded_small_glob_rot/images"
@@ -205,7 +113,7 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
     # val_mask_datagen = ImageDataGenerator(**val_mask_data_gen_args)
 
     # Provide the same seed to flow methods for train generators
-    seed = 212
+    seed = 1
     train_image_generator = train_image_datagen.flow_from_directory(
         train_image_dir,
         batch_size=batch_size,
@@ -255,20 +163,43 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
     # plt.imshow(y_post[:, :, 13])
     # plt.show()
 
-    segs_model, smpl_model, verts_model, projects_model = build_model(
-        batch_size,
-        (input_wh, input_wh, 3),
-        "./neutral_smpl_with_cocoplus_reg.pkl",
-        output_wh,
-        num_classes,
-        use_IEF=use_IEF,
-        vertex_sampling=vertex_sampling,
-        scaledown=scaledown)
-
     adam_optimiser = Adam(lr=0.0001)
-    segs_model.compile(optimizer=adam_optimiser,
-                       loss=categorical_focal_loss(gamma=2.0, weight_classes=weight_classes),
-                       metrics=['accuracy'])
+
+    if resume_from is not None:
+        print("Resuming model from ", resume_from)
+        smpl_model = load_model(os.path.join("./test_models", resume_from),
+                                custom_objects={'dd': dd,
+                                                'tf': tf})
+
+        verts_model, projects_model, segs_model = build_full_model_from_saved_model(smpl_model,
+                                                                                    output_wh,
+                                                                                    "./neutral_smpl_with_cocoplus_reg.pkl",
+                                                                                    batch_size / num_gpus,
+                                                                                    num_classes)
+        print("Model loaded.")
+
+    else:
+        segs_model, smpl_model, verts_model, projects_model = build_model(
+            batch_size / num_gpus,
+            (input_wh, input_wh, 3),
+            "./neutral_smpl_with_cocoplus_reg.pkl",
+            output_wh,
+            num_classes,
+            use_IEF=use_IEF,
+            vertex_sampling=vertex_sampling,
+            scaledown=scaledown)
+
+    if num_gpus > 1:
+        parallel_segs_model = multi_gpu_model(segs_model, gpus=num_gpus)
+        parallel_segs_model.compile(optimizer=adam_optimiser,
+                                    loss=categorical_focal_loss(gamma=2.0,
+                                                                weight_classes=weight_classes),
+                                    metrics=['accuracy'])
+    elif num_gpus == 1:
+        segs_model.compile(optimizer=adam_optimiser,
+                           loss=categorical_focal_loss(gamma=2.0,
+                                                       weight_classes=weight_classes),
+                           metrics=['accuracy'])
 
     print("Model compiled.")
 
@@ -286,24 +217,19 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
                                                     num_classes))
                 yield (train_data, reshaped_train_labels)
 
-        # def val_data_gen():
-        #     while True:
-        #         val_data, val_labels = generate_data(val_image_generator,
-        #                                                  val_mask_generator,
-        #                                                  batch_size, num_classes)
-        #         reshaped_val_labels = np.reshape(val_labels,
-        #                                            (batch_size, img_dec_wh * img_dec_wh,
-        #                                             num_classes))
-        #         yield (val_data, reshaped_val_labels)
-
-        history = segs_model.fit_generator(train_data_gen(),
-                                           steps_per_epoch=int((num_train_images/batch_size)/5),
-                                           nb_epoch=1,
-                                           verbose=1)
-
+        if num_gpus > 1:
+            history = parallel_segs_model.fit_generator(train_data_gen(),
+                                                        steps_per_epoch=int(num_train_images/(batch_size*5)),
+                                                        nb_epoch=1,
+                                                        verbose=1)
+        elif num_gpus == 1:
+            history = segs_model.fit_generator(train_data_gen(),
+                                               steps_per_epoch=int(num_train_images/(batch_size*5)),
+                                               nb_epoch=1,
+                                               verbose=1)
         renderer = SMPLRenderer()
 
-        if trial % 5 == 0:
+        if trial % 10 == 0:
             inputs = []
             for fname in sorted(os.listdir(monitor_dir)):
                 if fname.endswith(".png"):
@@ -316,8 +242,8 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
                     inputs.append(input_image)
 
             input_images_array = np.array(inputs)
-            input_images_array1 = input_images_array[:batch_size, :, :, :]
-            input_images_array2 = input_images_array[batch_size:, :, :, :]
+            input_images_array1 = input_images_array[:batch_size/num_gpus, :, :, :]
+            input_images_array2 = input_images_array[batch_size/num_gpus:, :, :, :]
 
             smpls1 = smpl_model.predict(input_images_array1)
             verts1 = verts_model.predict(input_images_array1)
@@ -361,7 +287,7 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
                     plt.savefig("./full_network_monitor_train/image_" + str(i) + ".png")
 
             if save_model:
-                save_fname = "{dataset}_{output_wh}x{output_wh}_resnet_augmented".format(dataset=dataset,
+                save_fname = "{dataset}_{output_wh}x{output_wh}_resnet".format(dataset=dataset,
                                                                                output_wh=output_wh)
                 if use_IEF:
                     save_fname += "_ief"
@@ -370,7 +296,7 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
                 if vertex_sampling is not None:
                     save_fname += "_vs{vertex_sampling}".format(vertex_sampling=vertex_sampling)
                 if weight_classes:
-                    save_fname += "_weighted"
+                    save_fname += "_arms_weighted_2_bg_weighted_0point3_gamma2_multigpu"
                 save_fname += "_{trial}.hdf5".format(trial=trial)
                 smpl_model.save(os.path.join('./test_models', save_fname))
                 print('SAVE NAME', save_fname)
@@ -379,5 +305,5 @@ def train(input_wh, output_wh, dataset, use_IEF=False, vertex_sampling=None,
 
 
 train(256, 48, 'up-s31', use_IEF=True, vertex_sampling=None, scaledown=0.005,
-      weight_classes=True, save_model=True)
+      weight_classes=True, save_model=True, num_gpus=1, resume_from=None)
 
