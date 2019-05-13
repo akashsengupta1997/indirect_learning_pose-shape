@@ -44,15 +44,17 @@ def build_full_model(smpl_model, output_wh, smpl_path, batch_size=1):
     return verts_model, projects_model, segs_model
 
 
-def compute_mean_iou(ground_truth, predict, num_classes):
+def compute_intersection_and_union(ground_truth, predict, num_classes):
     """
-    Compute IoU averaged over all classes between ground truth label and predicted label
+    Compute number of intersections and unions between ground truth label and predicted label
+    (for 1 training example).
     :param ground_truth:
     :param predict:
     :param num_classes:
-    :return: mean IOU over all classes for 1 training example
+    :return: num_intersections, num_unions
     """
-    class_ious = []
+    num_intersections_per_class = []
+    num_unions_per_class = []
     for class_num in range(1, num_classes):  # not including background class
         ground_truth_binary = np.zeros(ground_truth.shape)
         predict_binary = np.zeros(predict.shape)
@@ -61,25 +63,26 @@ def compute_mean_iou(ground_truth, predict, num_classes):
 
         intersection = np.logical_and(ground_truth_binary, predict_binary)
         union = np.logical_or(ground_truth_binary, predict_binary)
-        if np.sum(union) != 0:  # Don't include if no occurences of class in image
-            iou_score = float(np.sum(intersection)) / np.sum(union)
-            class_ious.append(iou_score)
+        num_intersections = float(np.sum(intersection))
+        num_unions = float(np.sum(union))
+        num_intersections_per_class.append(num_intersections)
+        num_unions_per_class.append(num_unions)
+        # print(num_intersections, num_unions)
 
-    return np.mean(class_ious)
+    return np.array(num_intersections_per_class), np.array(num_unions_per_class)
 
 
-def compute_pixel_accuracy(ground_truth, predict):
+def count_correct_predicts(ground_truth, predict):
     """
-    Compute pixel-wise class accuracy for 1 training example.
+    Counts number of correct predicts in 1 training example.
     :param ground_truth:
     :param predict:
     :return: pixel accuracy
     """
     correct_predicts = np.equal(ground_truth, predict)
-    num_correct_predicts = np.sum(correct_predicts)
-    accuracy = num_correct_predicts/float(ground_truth.size)
+    num_correct_predicts = float(np.sum(correct_predicts))
 
-    return accuracy
+    return num_correct_predicts
 
 
 def evaluate_iou_and_acc(eval_image_dir, eval_mask_dir, input_wh, output_wh, num_classes,
@@ -102,8 +105,12 @@ def evaluate_iou_and_acc(eval_image_dir, eval_mask_dir, input_wh, output_wh, num
                                                                output_wh,
                                                                "./neutral_smpl_with_cocoplus_reg.pkl")
 
-    ious = []
-    accuracies = []
+    total_intersects_per_class = np.zeros(31)
+    total_unions_per_class = np.zeros(31)
+    total_correct_predicts = 0
+    num_eval_images = len([fname for fname in sorted(os.listdir(eval_image_dir)) if
+                           fname.endswith(".png")])
+    print ("Evaluation set size:", num_eval_images)
     for fname in sorted(os.listdir(eval_image_dir)):
         if fname.endswith(".png"):
             print(fname)
@@ -117,17 +124,32 @@ def evaluate_iou_and_acc(eval_image_dir, eval_mask_dir, input_wh, output_wh, num
                                               (output_wh, output_wh),
                                               interpolation=cv2.INTER_NEAREST)  # (output_wh, output_wh)
 
-            iou = compute_mean_iou(ground_truth_seg_map, predicted_seg_map, num_classes)
-            print("IOU", iou)
-            accuracy = compute_pixel_accuracy(ground_truth_seg_map, predicted_seg_map)
-            print("Accuracy", accuracy)
-            ious.append(iou)
-            accuracies.append(accuracy)
+            num_intersects_per_class, num_unions_per_class = compute_intersection_and_union(ground_truth_seg_map,
+                                                                                            predicted_seg_map,
+                                                                                            num_classes)
+            print("I/Us for image", num_intersects_per_class, num_unions_per_class)
+            total_intersects_per_class += num_intersects_per_class
+            total_unions_per_class += num_unions_per_class
+            print("Total I/Us", total_intersects_per_class, total_unions_per_class)
 
-    mean_iou_over_dataset = np.mean(ious)
-    mean_acc_over_dataset = np.mean(accuracies)
-    print("Mean IOU over dataset", mean_iou_over_dataset)
-    print("Mean accuracy over dataset", mean_acc_over_dataset)
+            # plt.figure(1)
+            # plt.subplot(211)
+            # plt.imshow(predicted_seg_map)
+            # plt.subplot(212)
+            # plt.imshow(ground_truth_seg_map)
+            # plt.show()
+
+            num_correct_predicts = count_correct_predicts(ground_truth_seg_map,
+                                                          predicted_seg_map)
+            total_correct_predicts += num_correct_predicts
+            print("Correct predicts for image", num_correct_predicts)
+            print("Total correct predicts", total_correct_predicts)
+
+    ious = np.divide(total_intersects_per_class, total_unions_per_class)
+    mean_iou = np.mean(ious)
+    print("Mean IOU", mean_iou)
+    accuracy = total_correct_predicts/(output_wh*output_wh*num_eval_images)
+    print("Overall accuracy over dataset", accuracy)
 
 
 evaluate_iou_and_acc("/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded_small_glob_rot/val_images/val",
