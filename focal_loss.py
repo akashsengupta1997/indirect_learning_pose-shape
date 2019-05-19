@@ -18,23 +18,33 @@ def categorical_focal_loss(gamma=2.0, weight_classes=False):
 
         if weight_classes:
 
-            weights = np.ones(32)
-            weights[0] = 0.3
-            weights[1] = 2.0
-            weights[2] = 2.0
-            weights[3] = 2.0
-            weights[4] = 2.0
+            # weights = np.ones(32)
+            # weights[0] = 0.3
+            # weights[1] = 2.0
+            # weights[2] = 2.0
+            # weights[3] = 2.0
+            # weights[4] = 2.0
+            #
+            # weights[10] = 2.0
+            # weights[12] = 2.0
+            #
+            # weights[14] = 2.0
+            # weights[15] = 2.0
+            # weights[16] = 2.0
+            # weights[17] = 2.0
+            #
+            # weights[23] = 2.0
+            # weights[25] = 2.0
 
-            weights[10] = 2.0
-            weights[12] = 2.0
+            weights = [1.03324042e-04, 3.02493745e-02, 1.30634496e-01, 2.98523010e-02,
+                       3.16610807e-02, 3.16602506e-02, 2.03280074e-02, 8.58922762e-03,
+                       6.56260681e-03, 9.47177711e-03, 1.57712035e-02, 1.34693966e-02,
+                       4.45866666e-02, 3.52281362e-02, 3.23108385e-02, 1.31530909e-01,
+                       3.13854163e-02, 3.26127601e-02, 3.36627904e-02, 1.92015468e-02,
+                       8.54062987e-03, 6.74304680e-03, 9.33962334e-03, 1.55358396e-02,
+                       1.35297609e-02, 4.52940730e-02, 3.58567991e-02, 2.79993804e-02,
+                       3.02493745e-02, 4.28206546e-02, 4.34602058e-02, 3.17585020e-02]
 
-            weights[14] = 2.0
-            weights[15] = 2.0
-            weights[16] = 2.0
-            weights[17] = 2.0
-
-            weights[23] = 2.0
-            weights[25] = 2.0
             weights = tf.constant(weights, dtype='float32')
             cross_entropy = tf.multiply(cross_entropy, weights)
             print("WEIGHTED LOSS")
