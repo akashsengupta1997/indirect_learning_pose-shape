@@ -9,6 +9,8 @@
 
 *.png
 *.jpg
+!eg1.jpg
+!eg2.jpg
 *.pdf
 *.pages
 *.rtf
