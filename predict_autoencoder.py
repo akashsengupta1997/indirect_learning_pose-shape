@@ -103,8 +103,8 @@ def build_full_model(smpl_model, output_wh, smpl_path, batch_size=1):
 
 def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=False,
                         save_dir=None, overlay_projects=True, pad_orig_img=True):
-    test_image_dir = '/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded_small_glob_rot/val_masks/val'
-    orig_image_dir = '/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded_small_glob_rot/val_images/val'
+    test_image_dir = './results/my_singleperson_imgs/legs_ambiguous/autoencoder_fpn48x48'
+    orig_image_dir = './results/my_singleperson_imgs/legs_ambiguous/'
     renderer = SMPLRenderer()
     smpl_model = load_model(os.path.join("./autoencoder_weights", model_fname),
                             custom_objects={'dd': dd,
@@ -150,7 +150,7 @@ def predict_autoencoder(input_wh, output_wh, num_classes, model_fname, save=Fals
 predict_autoencoder(256,
                     48,
                     32,
-                    'up-s31_48x48_resnet_ief_scaledown0005_arms_weighted2_bg_weighted_0point3_gamma2_multigpu_350.hdf5',
-                    save=False,
-                    save_dir=None,
-                    pad_orig_img=False)
+                    'up-s31_48x48_resnet_ief_scaledown0005_arms_weighted2_bg_weighted_0point3_gamma2_690.hdf5',
+                    save=True,
+                    save_dir='./results/my_singleperson_imgs/legs_ambiguous/autoencoder_fpn48x48',
+                    pad_orig_img=True)
