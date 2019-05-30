@@ -27,23 +27,16 @@ def build_model(train_batch_size, input_shape, smpl_path, output_wh, num_classes
 
         img_features = Conv2D(256, (3, 3), activation='relu', padding='same')(img_features)
         img_features = BatchNormalization()(img_features)
-        img_features = MaxPooling2D()(img_features)
+        img_features = MaxPooling2D(pool_size=(4, 4))(img_features)
 
         img_features = Conv2D(512, (3, 3), activation='relu', padding='same')(img_features)
         img_features = BatchNormalization()(img_features)
         img_features = MaxPooling2D()(img_features)
 
-        img_features = Conv2D(1024, (3, 3), activation='relu', padding='same')(img_features)
-        img_features = BatchNormalization()(img_features)
-        img_features = MaxPooling2D()(img_features)
-
-        img_features = Conv2D(1024, (3, 3), activation='relu', padding='same')(img_features)
-        img_features = BatchNormalization()(img_features)
-        img_features = MaxPooling2D()(img_features)
-
         img_features = Conv2D(2048, (3, 3), activation='relu', padding='same')(img_features)
         img_features = BatchNormalization()(img_features)
-        img_features = MaxPooling2D()(img_features)
+        img_features = MaxPooling2D(pool_size=(4, 4))(img_features)
+
         img_features = Reshape((2048,))(img_features)
 
     elif encoder_architecture == 'resnet50':
