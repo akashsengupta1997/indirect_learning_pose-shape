@@ -25,6 +25,27 @@ def build_model(train_batch_size, input_shape, smpl_path, output_wh, num_classes
         inp = Input(shape=input_shape)
         img_features = build_enet(inp)  # (N, 32, 32, 128) output size from enet
 
+        img_features = Conv2D(256, (3, 3), activation='relu', padding='same')(img_features)
+        img_features = BatchNormalization()(img_features)
+        img_features = MaxPooling2D()(img_features)
+
+        img_features = Conv2D(512, (3, 3), activation='relu', padding='same')(img_features)
+        img_features = BatchNormalization()(img_features)
+        img_features = MaxPooling2D()(img_features)
+
+        img_features = Conv2D(1024, (3, 3), activation='relu', padding='same')(img_features)
+        img_features = BatchNormalization()(img_features)
+        img_features = MaxPooling2D()(img_features)
+
+        img_features = Conv2D(1024, (3, 3), activation='relu', padding='same')(img_features)
+        img_features = BatchNormalization()(img_features)
+        img_features = MaxPooling2D()(img_features)
+
+        img_features = Conv2D(2048, (3, 3), activation='relu', padding='same')(img_features)
+        img_features = BatchNormalization()(img_features)
+        img_features = MaxPooling2D()(img_features)
+        img_features = Reshape((2048,))(img_features)
+
     elif encoder_architecture == 'resnet50':
         resnet = resnet50.ResNet50(include_top=False, weights=None, input_shape=input_shape)
         inp = resnet.input
