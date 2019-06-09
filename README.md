@@ -11,8 +11,8 @@ The SMPL body model (http://smpl.is.tue.mpg.de) is used to parametrise 3D human 
 
 Please give the above gif a few seconds to load!
 
-<img src="eg1.jpg" width="300">
-<img src="eg1.jpg" width="300">
+<img src="eg1.jpg" width="400">
+<img src="eg2.jpg" width="400">
 
 Clockwise: Input image, (ground truth segmentation - for still images above), 3D body model rendering, 31 Body-part segmentation (network output), Locations of (projected) predicted vertices relative to input image.
 
