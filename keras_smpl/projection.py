@@ -9,6 +9,7 @@ from keras import backend as K
 
 def persepective_project(verts):
     """
+    INCOMPLETE - I don't use this anywhere.
     Perspective projection of vertices onto image plane.
     For now, the camera parameters (T and intrinsics) are hard-coded here - could try and learn
     them in the future?
@@ -52,9 +53,10 @@ def persepective_project(verts):
 
 def orthographic_project(inputs, vertex_sampling):
     """
-
-    :param verts:
-    :return:
+    Orthographically project, scale and translate 3D vertices on 2D image plane.
+    :param inputs: 3D vertex mesh (6890 3D vertices) and camera parameters.
+    :return: scaled and translated 2D vertices along with their original depth values (needed
+    for visibility mask computation).
     """
     verts, smpl = inputs
     k_u = smpl[:, 0]

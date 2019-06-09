@@ -63,6 +63,19 @@ def generate_data(image_generator, mask_generator, n, num_classes):
 
 def train(input_wh, output_wh, dataset, num_gpus=1, use_IEF=False, vertex_sampling=None,
           scaledown=0.005, weight_classes=False, save_model=False, resume_from=None):
+    """
+    Train indirect learning via body-part segmentation network.
+    :param input_wh: input height and width
+    :param output_wh: output height and width
+    :param dataset: training dataset
+    :param num_gpus: number of GPUs
+    :param use_IEF: bool - use iterative error feedback?
+    :param vertex_sampling:
+    :param scaledown: value of scaledown parameter
+    :param weight_classes: bool - weight classes in loss function?
+    :param save_model: bool - save model?
+    :param resume_from:
+    """
     batch_size = 4 * num_gpus
 
     if dataset == 'up-s31':
@@ -304,6 +317,6 @@ def train(input_wh, output_wh, dataset, num_gpus=1, use_IEF=False, vertex_sampli
     print("Finished")
 
 
-train(256, 48, 'up-s31', use_IEF=True, vertex_sampling=None, scaledown=0.005,
+train(256, 64, 'up-s31', use_IEF=True, vertex_sampling=None, scaledown=0.005,
       weight_classes=True, save_model=True, num_gpus=1, resume_from=None)
 

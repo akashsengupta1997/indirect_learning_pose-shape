@@ -1,5 +1,4 @@
 import os
-import time
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -17,7 +16,7 @@ from preprocessing import pad_image
 
 def realtime_demo(input_wh, output_wh, model_fname, render_vertices=False, segment=False):
     """
-    Real-time predictions from webcam.
+    Real-time predictions using auto-encoder model and prepended enet segmentation network.
     :param input_wh:
     :param output_wh:
     :param model_fname:
@@ -26,14 +25,18 @@ def realtime_demo(input_wh, output_wh, model_fname, render_vertices=False, segme
     :param segment: segment vertices into body-parts
     """
     renderer = SMPLRenderer()
-    smpl_model = load_model(os.path.join("./full_network_weights", model_fname),
+    smpl_model = load_model(os.path.join("./autoencoder_weights", model_fname),
                             custom_objects={'dd': dd,
                                             'tf': tf})
-    print('Model {model_fname} loaded'.format(model_fname=model_fname))
+    print('Autoencoder SMPL Model {model_fname} loaded'.format(model_fname=model_fname))
 
     verts_model, projects_model, segs_model = build_full_model_for_predict(smpl_model,
                                                                            output_wh,
                                                                            "./neutral_smpl_with_cocoplus_reg.pkl")
+
+    enet_model_path = './enet_weights/enet256_small_glob_rot_no_horiz_flip0401.hdf5'
+    enet_model = load_model(enet_model_path)
+    print('ENet Model {enet_model_path} loaded'.format(enet_model_path=enet_model_path))
 
     with open("./keras_smpl/part_vertices.pkl", 'rb') as f:
         part_indices = pickle.load(f)
@@ -58,10 +61,15 @@ def realtime_demo(input_wh, output_wh, model_fname, render_vertices=False, segme
         img = img * (1/255.0)
         # Add batch dimension: 1 x D x D x 3
         img_tensor = np.expand_dims(img, 0)
+        seg_tensor = np.reshape(enet_model.predict(img_tensor),
+                                (-1, input_wh, input_wh, 32))
+        seg_img_tensor = np.argmax(seg_tensor, axis=-1)
+        seg_img_tensor = np.expand_dims(seg_img_tensor, axis=-1)
+        seg_img_tensor = seg_img_tensor * (1.0 / 31)
 
         if render_vertices:
             # RENDERING VERTICES IS SLOW
-            verts = verts_model.predict(img_tensor)
+            verts = verts_model.predict(seg_img_tensor)
             rend_img = renderer(verts=verts[0], render_seg=segment)
 
             # Display
@@ -74,8 +82,8 @@ def realtime_demo(input_wh, output_wh, model_fname, render_vertices=False, segme
 
         else:
             # PLOTTING PROJECTS IS FASTER
-            projects = projects_model.predict(img_tensor)
-            plt.figure(1)
+            projects = projects_model.predict(seg_img_tensor)
+            plt.figure(1,figsize=(10,10))
             plt.clf()
             scatter_scale = float(input_wh) / output_wh
             if segment:
@@ -91,7 +99,6 @@ def realtime_demo(input_wh, output_wh, model_fname, render_vertices=False, segme
             plt.imshow(cv2.flip(img, 0),
                        alpha=0.9)
             plt.gca().invert_yaxis()
-            # plt.show(block=False)
             plt.draw()
             plt.pause(0.0001)
 
@@ -105,6 +112,6 @@ def realtime_demo(input_wh, output_wh, model_fname, render_vertices=False, segme
 
 realtime_demo(256,
               64,
-              'up-s31_64x64_resnet_ief_scaledown0005_arms_weighted_2_bg_weighted_0point3_gamma2_1170.hdf5',
-              render_vertices=True,
+              'up-s31_64x64_resnet_ief_scaledown0005_arms_weighted2_bg_weighted_0point3_gamma2_600.hdf5',
+              render_vertices=False,
               segment=True)

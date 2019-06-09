@@ -17,7 +17,7 @@ def categorical_focal_loss(gamma=2.0, weight_classes=False):
         cross_entropy = -y_true * K.log(y_pred)  # (N, img_wh^2, 32)
 
         if weight_classes:
-
+            # Weighting scheme to up-weight hands, elbows, knees, ankles and down-weight bg.
             weights = np.ones(32)
             weights[0] = 0.3
             weights[1] = 2.0

@@ -1,20 +1,16 @@
-# TODO write function that takes verts and camera params as input and goes to bodypart seg
-# can then implement this as Keras lambda layer
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
 import pickle
-from keras import backend as K
 
 
 def projects_to_seg(input, img_wh, vertex_sampling):
     """
-
-    :param projects:
-    :return:
+    Create body-part segmentation tensor from projected vertices and visibility mask.
+    :param input: projected vertices and visibility mask.
+    :return: (batch_size, img_wh, img_wh, 32) segmentation tensor
     """
     projects_with_depth, mask_vals = input
     projects = projects_with_depth[:, :, :2]

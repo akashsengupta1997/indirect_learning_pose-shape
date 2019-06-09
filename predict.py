@@ -7,14 +7,9 @@ import deepdish as dd
 import cv2
 
 import tensorflow as tf
-from keras.models import Model, load_model
-from keras.layers import Lambda
+from keras.models import load_model
 
-from keras_smpl.batch_smpl import SMPLLayer
-from keras_smpl.projection import orthographic_project
-from keras_smpl.compute_mask import compute_mask
-from keras_smpl.projects_to_seg import projects_to_seg
-
+from model import build_full_model_for_predict
 from renderer import SMPLRenderer
 from preprocessing import pad_image
 
@@ -82,37 +77,28 @@ def visualise_and_save(fname, padded_img, verts, projects, seg_maps, renderer, i
         plt.show()
 
 
-def build_full_model(smpl_model, output_wh, smpl_path, batch_size=1):
-    inp = smpl_model.input
-    smpl = smpl_model.output
-    verts = SMPLLayer(smpl_path, batch_size=batch_size)(smpl)
-    projects_with_depth = Lambda(orthographic_project,
-                                 arguments={'vertex_sampling': None},
-                                 name='project')([verts, smpl])
-    masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
-    segs = Lambda(projects_to_seg,
-                  arguments={'img_wh': output_wh,
-                             'vertex_sampling': None},
-                  name='segment')([projects_with_depth, masks])
-
-    verts_model = Model(inputs=inp, outputs=verts)
-    projects_model = Model(inputs=inp, outputs=projects_with_depth)
-    segs_model = Model(inputs=inp, outputs=segs)
-
-    return verts_model, projects_model, segs_model
-
-
 def predict(test_image_dir, input_wh, output_wh, model_fname, save=False, save_dir=None,
             pad=False, overlay_projects=True):
+    """
+    Predict on images from test_image_dir.
+    :param test_image_dir: filepath to directory containing test images.
+    :param input_wh: input image height and width
+    :param output_wh: output segmentation height and width
+    :param model_fname: fname of saved encoder model.
+    :param save: bool flag for saving outputs option
+    :param save_dir: filepath to directory to save outputs to
+    :param pad: bool flag for padding input image with 0s
+    :param overlay_projects: bool flag for overlaying projects on input image.
+    """
     renderer = SMPLRenderer()
     smpl_model = load_model(os.path.join("./full_network_weights", model_fname),
                             custom_objects={'dd': dd,
                                             'tf': tf})
     print('Model {model_fname} loaded'.format(model_fname=model_fname))
 
-    verts_model, projects_model, segs_model = build_full_model(smpl_model,
-                                                               output_wh,
-                                                               "./neutral_smpl_with_cocoplus_reg.pkl")
+    verts_model, projects_model, segs_model = build_full_model_for_predict(smpl_model,
+                                                                           output_wh,
+                                                                           "./neutral_smpl_with_cocoplus_reg.pkl")
 
     verts_pred_times = []
     segs_pred_times = []
@@ -140,11 +126,11 @@ def predict(test_image_dir, input_wh, output_wh, model_fname, save=False, save_d
             print("Average segmentation predict time:", np.mean(segs_pred_times))
 
 
-predict('./results/my_singleperson_vids/full_network_test48x48/my_vid7/',
+predict('./results/my_singleperson_imgs/arms_folded/',
         256,
-        48,
-        'up-s31_48x48_resnet_ief_scaledown0005_arms_weighted_2_bg_weighted_0point3_gamma2_1630.hdf5',
+        64,
+        'up-s31_64x64_resnet_ief_scaledown0005_arms_weighted_2_bg_weighted_0point3_gamma2_1170.hdf5',
         save=True,
-        save_dir='./results/my_singleperson_vids/full_network_test48x48/my_vid7/',
+        save_dir='./results/my_singleperson_imgs/arms_folded/full_network64x64',
         pad=True,
         overlay_projects=True)

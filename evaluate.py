@@ -1,18 +1,13 @@
 import os
 
-from matplotlib import pyplot as plt
 import numpy as np
 import deepdish as dd
 import cv2
 
 import tensorflow as tf
-from keras.models import Model, load_model
-from keras.layers import Lambda
+from keras.models import load_model
 
-from keras_smpl.batch_smpl import SMPLLayer
-from keras_smpl.projection import orthographic_project
-from keras_smpl.compute_mask import compute_mask
-from keras_smpl.projects_to_seg import projects_to_seg
+from model import build_full_model_for_predict
 
 
 def load_input_img(image_dir, fname, input_wh):
@@ -22,26 +17,6 @@ def load_input_img(image_dir, fname, input_wh):
     input_img = input_img * (1.0 / 255)
     input_img = np.expand_dims(input_img, axis=0)  # need 4D input (add batch dimension)
     return input_img
-
-
-def build_full_model(smpl_model, output_wh, smpl_path, batch_size=1):
-    inp = smpl_model.input
-    smpl = smpl_model.output
-    verts = SMPLLayer(smpl_path, batch_size=batch_size)(smpl)
-    projects_with_depth = Lambda(orthographic_project,
-                                 arguments={'vertex_sampling': None},
-                                 name='project')([verts, smpl])
-    masks = Lambda(compute_mask, name='compute_mask')(projects_with_depth)
-    segs = Lambda(projects_to_seg,
-                  arguments={'img_wh': output_wh,
-                             'vertex_sampling': None},
-                  name='segment')([projects_with_depth, masks])
-
-    verts_model = Model(inputs=inp, outputs=verts)
-    projects_model = Model(inputs=inp, outputs=projects_with_depth)
-    segs_model = Model(inputs=inp, outputs=segs)
-
-    return verts_model, projects_model, segs_model
 
 
 def compute_intersection_and_union(ground_truth, predict, num_classes):
@@ -101,8 +76,8 @@ def evaluate_iou_and_acc(eval_image_dir, eval_mask_dir, input_wh, output_wh, num
                                             'tf': tf})
     print('Model {model_fname} loaded'.format(model_fname=model_fname))
 
-    verts_model, projects_model, segs_model = build_full_model(smpl_model,
-                                                               output_wh,
+    verts_model, projects_model, segs_model = build_full_model_for_predict(smpl_model,
+                                                                           output_wh,
                                                                "./neutral_smpl_with_cocoplus_reg.pkl")
 
     total_intersects_per_class = np.zeros(31)

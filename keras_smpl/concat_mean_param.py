@@ -19,10 +19,6 @@ def concat_mean_param(img_features, img_wh):
     mean[0, 4:] = np.expand_dims(np.hstack((mean_pose, mean_shape)), axis=0)
 
     # Set initial camera parameters - dependent on output image size!
-    # mean[0, 0] = 48.0
-    # mean[0, 1] = 48.0
-    # mean[0, 2] = 48.0
-    # mean[0, 3] = 60.0
     mean[0, 0] = img_wh/2.0
     mean[0, 1] = img_wh/2.0
     mean[0, 2] = img_wh/2.0
@@ -32,7 +28,4 @@ def concat_mean_param(img_features, img_wh):
     mean = tf.tile(mean, [K.shape(img_features)[0], 1])
 
     state = tf.concat([img_features, mean], axis=1)
-    #return [state, mean]
     return state
-
-# concat_mean_param(None)

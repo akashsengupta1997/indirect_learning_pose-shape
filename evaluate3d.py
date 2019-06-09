@@ -30,6 +30,13 @@ def load_gt_pose(fname):
 
 
 def evaluate_pose_param_mse(eval_image_dir, input_wh, model_fname):
+    """
+    Evaluate mean squared error between predicted 3D pose parameters and ground truth pose
+    parameters (from UP-3D).
+    :param eval_image_dir: path to directory with test images
+    :param input_wh
+    :param model_fname: file name of model to be tested
+    """
     smpl_model = load_model(os.path.join("./full_network_weights", model_fname),
                             custom_objects={'dd': dd,
                                             'tf': tf})

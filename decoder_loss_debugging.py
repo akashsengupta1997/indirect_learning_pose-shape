@@ -14,10 +14,7 @@ from keras_smpl.projection import persepective_project, orthographic_project, \
 from keras_smpl.projects_to_seg import projects_to_seg
 from keras_smpl.set_cam_params import set_cam_params, load_mean_set_cam_params
 from keras_smpl.compute_mask import compute_mask
-from keras_smpl.compute_mask_batch_map_only import compute_mask_batch_map_only
-from keras_smpl.compute_mask_without_map import compute_mask_without_map
 
-from renderer import SMPLRenderer
 
 from focal_loss import categorical_focal_loss
 

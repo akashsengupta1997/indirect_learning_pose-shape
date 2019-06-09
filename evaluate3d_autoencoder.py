@@ -31,6 +31,13 @@ def load_gt_pose(fname):
 
 
 def evaluate_pose_param_mse(eval_dir, input_wh, num_classes, model_fname):
+    """
+    Evaluate mean squared error between predicted 3D pose parameters and ground truth pose
+    parameters (from UP-3D).
+    :param eval_image_dir: path to directory with test images
+    :param input_wh
+    :param model_fname: file name of model to be tested
+    """
     smpl_model = load_model(os.path.join("./autoencoder_weights", model_fname),
                             custom_objects={'dd': dd,
                                             'tf': tf})
@@ -61,8 +68,5 @@ def evaluate_pose_param_mse(eval_dir, input_wh, num_classes, model_fname):
 
 evaluate_pose_param_mse("/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded_small_glob_rot/val_masks/val",
                         256,
+                        32,
                         'up-s31_48x48_resnet_ief_scaledown0005_arms_weighted2_bg_weighted_0point3_gamma2_690.hdf5')
-
-# evaluate_pose_param_mse("/Users/Akash_Sengupta/Documents/4th_year_project_datasets/up-s31/s31_padded_small_glob_rot_enet_segs",
-#                         256,
-#                         'up-s31_48x48_resnet_ief_scaledown0005_arms_weighted2_bg_weighted_0point3_gamma2_690.hdf5')

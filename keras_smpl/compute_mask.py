@@ -11,12 +11,12 @@ from keras import backend as K
 
 def compute_mask(batch_projects_with_depth):
     """
-    Outputs N x num_vertices tensor of mask_vals: mask_val is either 500 (if vertex is invisible) or
-    1 if visible.
+    Outputs N x num_vertices tensor of mask_vals: mask_val is either 500 (if vertex is
+    invisible) or 1 if visible.
     During projections to segmentation stage layer (projects_to_seg.py), this mask will be used
     to ensure that invisible vertices do not affect the segmentation output.
-    :param batch_projects_with_depth: N x num_vertices x 3 tensor of projected vertices and their
-    original depth values i.e. (u, v, z)
+    :param batch_projects_with_depth: N x num_vertices x 3 tensor of projected vertices and
+    their original depth values i.e. (u, v, z)
     :return:
     """
     batch_pixels = tf.round(batch_projects_with_depth[:, :, :2])  # N x num_vertices x 2
@@ -41,7 +41,7 @@ def compute_mask_map_over_batch(pixels_with_depth):
     original depth values.
     :return: mask
     """
-    img_wh = 96
+    img_wh = 64
     num_vertices = pixels_with_depth.get_shape().as_list()[0]  # num_vertices
     indices = tf.expand_dims(tf.range(num_vertices, dtype='float32'), axis=1)  # num_vertices x 1
     pixels_with_depth_and_index = tf.concat([pixels_with_depth, indices], axis=1)  # num_vertices x 4
